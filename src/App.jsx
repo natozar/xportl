@@ -11,8 +11,10 @@ import CapsuleModal from './components/CapsuleModal';
 import VortexModal from './components/VortexModal';
 import VibePing from './components/VibePing';
 import ReportModal from './components/ReportModal';
+import InstallPrompt from './components/InstallPrompt';
 import { useGeolocation } from './hooks/useGeolocation';
 import { useCamera } from './hooks/useCamera';
+import { usePwaInstall } from './hooks/usePwaInstall';
 import { createCapsule, getNearbyCapsules } from './services/capsules';
 import { createPing } from './services/pings';
 import { clusterCapsules } from './services/clustering';
@@ -34,6 +36,9 @@ export default function App() {
   const [showTos, setShowTos] = useState(false);
   const [showDisclaimer, setShowDisclaimer] = useState(false);
   const [blocked, setBlocked] = useState(null);
+
+  // ── PWA install ──
+  const pwa = usePwaInstall();
 
   // ── App state ──
   const geo = useGeolocation();
@@ -279,6 +284,16 @@ export default function App() {
   return (
     <div className="scanlines" style={styles.root}>
       <ARScene capsules={nearbyCapsules} pings={activePings} onCapsuleClick={handleCapsuleClick} onVortexClick={handleVortexClick} />
+
+      {/* PWA Install Prompt (non-blocking overlay) */}
+      {pwa.canInstall && (
+        <InstallPrompt
+          isIos={pwa.isIos}
+          isAndroid={pwa.isAndroid}
+          onInstall={pwa.install}
+          onDismiss={pwa.dismiss}
+        />
+      )}
 
       <div style={styles.overlay}>
         <Radar lat={geo.lat} lng={geo.lng} altitude={geo.altitude} nearbyCount={nearbyCapsules.length} />

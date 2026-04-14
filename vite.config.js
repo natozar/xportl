@@ -9,15 +9,20 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg', 'icons/*.png'],
       manifest: {
+        id: '/',
         name: 'XPortl - Capsulas do Tempo em AR',
         short_name: 'XPortl',
-        description: 'A Realidade Aumentada de Capsulas do Tempo',
+        description: 'A Realidade Aumentada de Capsulas do Tempo. Descubra portais digitais escondidos no mundo real.',
         theme_color: '#0d0a1a',
         background_color: '#0d0a1a',
-        display: 'fullscreen',
+        display: 'standalone',
+        display_override: ['standalone', 'fullscreen'],
         orientation: 'portrait',
         start_url: '/',
         scope: '/',
+        categories: ['games', 'social', 'entertainment'],
+        lang: 'pt-BR',
+        dir: 'ltr',
         icons: [
           {
             src: '/icons/icon-192.png',
@@ -28,19 +33,42 @@ export default defineConfig({
             src: '/icons/icon-512.png',
             sizes: '512x512',
             type: 'image/png',
-            purpose: 'any maskable',
+          },
+          {
+            src: '/icons/icon-512.png',
+            sizes: '512x512',
+            type: 'image/png',
+            purpose: 'maskable',
+          },
+        ],
+        screenshots: [
+          {
+            src: '/icons/icon-512.png',
+            sizes: '512x512',
+            type: 'image/png',
+            form_factor: 'narrow',
+            label: 'XPortl AR View',
           },
         ],
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
+        navigateFallback: '/index.html',
         runtimeCaching: [
           {
-            urlPattern: /^https:\/\/cdn\.jsdelivr\.net\/.*/i,
+            urlPattern: /^https:\/\/(aframe\.io|unpkg\.com|raw\.githack\.com|cdn\.jsdelivr\.net|cdn\.aframe\.io)\/.*/i,
             handler: 'CacheFirst',
             options: {
-              cacheName: 'cdn-cache',
-              expiration: { maxEntries: 50, maxAgeSeconds: 60 * 60 * 24 * 7 },
+              cacheName: 'cdn-libs',
+              expiration: { maxEntries: 30, maxAgeSeconds: 60 * 60 * 24 * 30 },
+            },
+          },
+          {
+            urlPattern: /^https:\/\/.*\.supabase\.co\/storage\/.*/i,
+            handler: 'StaleWhileRevalidate',
+            options: {
+              cacheName: 'capsule-media',
+              expiration: { maxEntries: 100, maxAgeSeconds: 60 * 60 * 24 * 3 },
             },
           },
         ],
