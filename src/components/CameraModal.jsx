@@ -497,7 +497,6 @@ export default function CameraModal({ onClose, onCapture, initialMode = 'photo' 
 const s = {
   backdrop: {
     position: 'fixed', inset: 0, zIndex: 200, background: '#000',
-    display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
   },
   video: {
     position: 'absolute', inset: 0, width: '100%', height: '100%',
@@ -553,7 +552,8 @@ const s = {
     color: 'rgba(255,255,255,0.65)',
   },
   bottomBar: {
-    position: 'relative', zIndex: 2, padding: '18px 24px 34px',
+    position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 2,
+    padding: '18px 24px calc(34px + env(safe-area-inset-bottom, 0px))',
     background: 'linear-gradient(to top, rgba(0,0,0,0.85), transparent)',
     display: 'flex', flexDirection: 'column', gap: 16,
   },
