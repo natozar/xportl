@@ -21,7 +21,7 @@ import { clusterCapsules } from './services/clustering';
 import { uploadMedia } from './services/storage';
 import { supabase } from './services/supabase';
 import {
-  getSession, getProfile, hasAcceptedTos, hasAcceptedLocationDisclaimer,
+  getProfile, hasAcceptedTos, hasAcceptedLocationDisclaimer,
   acceptTos, acceptLocationDisclaimer, isAccountBlocked,
 } from './services/auth';
 import { validateContent, checkRateLimit, checkRestrictedZone, logAccess } from './services/moderation';
@@ -54,36 +54,85 @@ export default function App() {
   const [reportTarget, setReportTarget] = useState(null);
   const scanVersion = useRef(0);
 
-  // ── Auth listener ──
+  // ── Auth listener (single source of truth) ──
   useEffect(() => {
-    getSession().then((s) => setSession(s));
+    // onAuthStateChange is the ONLY source of truth.
+    // It fires INITIAL_SESSION on subscribe (handles URL hash tokens from OAuth redirect),
+    // then SIGNED_IN / SIGNED_OUT / TOKEN_REFRESHED for subsequent changes.
+    // We do NOT call getSession() separately to avoid race conditions.
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, s) => {
-      setSession(s);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, s) => {
+      console.log('[XPortl Auth]', event, s?.user?.email ?? 'no user');
+
+      if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+        setSession(s);
+      } else if (event === 'SIGNED_OUT') {
+        setSession(null);
+        setProfile(null);
+        setBlocked(null);
+        setShowTos(false);
+        setShowDisclaimer(false);
+        setReady(false);
+      }
     });
 
-    return () => subscription.unsubscribe();
+    // Safety net: if onAuthStateChange doesn't fire within 3s (e.g. no hash, no stored session),
+    // resolve the loading state so we show AuthGate instead of infinite blank screen.
+    const timeout = setTimeout(() => {
+      setSession((prev) => (prev === undefined ? null : prev));
+    }, 3000);
+
+    return () => {
+      subscription.unsubscribe();
+      clearTimeout(timeout);
+    };
   }, []);
 
-  // ── Load profile when session changes ──
+  // ── Load profile when session changes (with retry for new OAuth users) ──
   useEffect(() => {
-    if (!session?.user?.id) { setProfile(null); return; }
+    if (!session?.user?.id) {
+      setProfile(null);
+      setBlocked(null);
+      return;
+    }
 
-    (async () => {
-      const p = await getProfile(session.user.id);
-      setProfile(p);
+    let cancelled = false;
 
-      // Check blocks
-      const blockStatus = isAccountBlocked(p);
-      if (blockStatus) { setBlocked(blockStatus); return; }
+    const loadProfile = async (retries = 3) => {
+      for (let i = 0; i < retries; i++) {
+        const p = await getProfile(session.user.id);
 
-      // Check ToS
-      if (!hasAcceptedTos(p)) { setShowTos(true); return; }
+        if (cancelled) return;
 
-      // Check location disclaimer
-      if (!hasAcceptedLocationDisclaimer(p)) { setShowDisclaimer(true); return; }
-    })();
-  }, [session]);
+        if (p) {
+          setProfile(p);
+
+          const blockStatus = isAccountBlocked(p);
+          if (blockStatus) { setBlocked(blockStatus); return; }
+
+          if (!hasAcceptedTos(p)) { setShowTos(true); return; }
+          if (!hasAcceptedLocationDisclaimer(p)) { setShowDisclaimer(true); return; }
+          return;
+        }
+
+        // Profile might not exist yet (trigger hasn't fired for new OAuth user).
+        // Wait and retry.
+        console.log(`[XPortl Auth] Profile not found, retry ${i + 1}/${retries}...`);
+        await new Promise((r) => setTimeout(r, 1000));
+      }
+
+      // After retries, still no profile — the trigger may have failed.
+      // Set a minimal profile so the app doesn't hang.
+      if (!cancelled) {
+        console.warn('[XPortl Auth] Profile not found after retries, proceeding with defaults');
+        setProfile({ id: session.user.id, account_status: 'active' });
+        setShowTos(true);
+      }
+    };
+
+    loadProfile();
+    return () => { cancelled = true; };
+  }, [session?.user?.id]);
 
   // ── Handle ToS acceptance ──
   const handleAcceptTos = async () => {
@@ -249,9 +298,16 @@ export default function App() {
 
   // ── Render gates in order ──
 
-  // 1. Loading
+  // 1. Loading (auth resolving — never show login prematurely)
   if (session === undefined) {
-    return <div style={{ width: '100%', height: '100%', background: 'var(--bg-void)' }} />;
+    return (
+      <div style={{ width: '100%', height: '100%', background: 'var(--bg-void)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ width: 64, height: 64, borderRadius: '50%', border: '2px solid var(--neon-cyan)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 25px rgba(0,240,255,0.3)', marginBottom: 16 }}>
+          <span style={{ fontSize: '2rem', fontWeight: 700, color: 'var(--neon-cyan)' }}>X</span>
+        </div>
+        <div style={{ width: 20, height: 20, border: '2px solid rgba(0,240,255,0.15)', borderTopColor: '#00f0ff', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+      </div>
+    );
   }
 
   // 2. Auth

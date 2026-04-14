@@ -7,7 +7,10 @@ const TOS_VERSION = '1.0.0';
 export async function signInWithGoogle() {
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: 'google',
-    options: { redirectTo: window.location.origin },
+    options: {
+      redirectTo: window.location.origin + '/',
+      skipBrowserRedirect: false,
+    },
   });
   if (error) throw error;
   return data;
