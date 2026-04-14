@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { isCapsuleLocked, isGhostCapsule, getTimeRemaining, haptic, consumeView, selfDestruct } from '../services/capsules';
 
-export default function CapsuleModal({ capsule, onClose, onSelfDestruct }) {
+export default function CapsuleModal({ capsule, onClose, onSelfDestruct, onReport }) {
   const [viewsLeft, setViewsLeft] = useState(null);
   const [destroying, setDestroying] = useState(false);
   const [audioPlaying, setAudioPlaying] = useState(false);
@@ -211,12 +211,20 @@ export default function CapsuleModal({ capsule, onClose, onSelfDestruct }) {
           </div>
         )}
 
-        {/* Meta */}
+        {/* Meta + Report */}
         <div style={st.meta}>
           <span style={st.metaChip}>{capsule.visibility_layer || 'public'}</span>
           {capsule.media_type && <span style={st.metaChip}>{capsule.media_type}</span>}
           {capsule.created_at && (
             <span style={st.metaChip}>{new Date(capsule.created_at).toLocaleDateString('pt-BR')}</span>
+          )}
+          {onReport && !locked && (
+            <button
+              style={st.reportBtn}
+              onClick={() => onReport(capsule)}
+            >
+              Denunciar
+            </button>
           )}
         </div>
       </div>
@@ -303,6 +311,11 @@ const st = {
   // ── Meta ──
   meta: { display: 'flex', gap: 8, marginTop: 14, paddingTop: 12, borderTop: '1px solid rgba(255,255,255,0.03)' },
   metaChip: { fontSize: '0.5rem', color: '#6b6b80', background: 'rgba(255,255,255,0.03)', padding: '3px 8px', borderRadius: 6 },
+  reportBtn: {
+    marginLeft: 'auto', fontSize: '0.5rem', color: 'rgba(255,51,102,0.5)', background: 'none',
+    border: '1px solid rgba(255,51,102,0.12)', borderRadius: 6, padding: '3px 10px',
+    fontFamily: 'inherit', fontWeight: 600, letterSpacing: '0.05em',
+  },
 
   // ── Destroy ──
   destroyContainer: {

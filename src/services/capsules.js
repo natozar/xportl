@@ -44,7 +44,7 @@ export function haptic(pattern = [100, 50, 100]) {
 
 // ── CRUD ──
 
-export async function createCapsule({ lat, lng, altitude, content, visibility_layer, unlock_date, media_url, media_type, views_left }) {
+export async function createCapsule({ lat, lng, altitude, content, visibility_layer, unlock_date, media_url, media_type, views_left, created_by }) {
   const capsule = {
     lat,
     lng,
@@ -55,6 +55,8 @@ export async function createCapsule({ lat, lng, altitude, content, visibility_la
     media_url: media_url || null,
     media_type: media_type || null,
     views_left: views_left ?? null,
+    created_by: created_by || null,
+    created_user_agent: navigator.userAgent,
   };
 
   if (!isSupabaseConfigured()) {
