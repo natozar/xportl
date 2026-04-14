@@ -522,14 +522,21 @@ export default function CameraModal({ onClose, onCapture, initialMode = 'photo' 
 const s = {
   backdrop: {
     position: 'fixed', inset: 0, zIndex: 200, background: '#000',
+    // Ensure this container captures all touch events (Android fix)
+    touchAction: 'none',
   },
   video: {
     position: 'absolute', inset: 0, width: '100%', height: '100%',
     objectFit: 'cover', background: '#000',
+    // Video feed must NOT intercept button taps
+    pointerEvents: 'none',
+    zIndex: 1,
   },
   previewMedia: {
     position: 'absolute', inset: 0, width: '100%', height: '100%',
     objectFit: 'contain', background: '#000',
+    pointerEvents: 'none',
+    zIndex: 1,
   },
   closeBtn: {
     position: 'absolute', top: 'calc(14px + env(safe-area-inset-top, 0px))', right: 14,
@@ -537,13 +544,16 @@ const s = {
     borderRadius: '50%', background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(10px)',
     WebkitBackdropFilter: 'blur(10px)',
     color: '#fff', border: '1px solid rgba(255,255,255,0.2)', fontSize: '1.5rem',
-    cursor: 'pointer', zIndex: 6, display: 'flex', alignItems: 'center', justifyContent: 'center',
+    cursor: 'pointer', zIndex: 10, display: 'flex', alignItems: 'center', justifyContent: 'center',
     lineHeight: 1, padding: 0,
+    pointerEvents: 'auto',
+    WebkitTapHighlightColor: 'transparent',
   },
   recBadge: {
     position: 'absolute', top: 'calc(18px + env(safe-area-inset-top, 0px))',
     left: '50%', transform: 'translateX(-50%)',
-    zIndex: 6, display: 'flex', alignItems: 'center', gap: 8,
+    zIndex: 10, display: 'flex', alignItems: 'center', gap: 8,
+    pointerEvents: 'none',
     padding: '6px 14px', background: 'rgba(255,51,102,0.2)',
     border: '1px solid #ff3366', borderRadius: 999,
     color: '#ff6688', fontSize: '0.72rem', fontWeight: 600, fontFamily: 'ui-monospace, monospace',
@@ -553,7 +563,8 @@ const s = {
     boxShadow: '0 0 10px #ff3366', animation: 'pulse-ring 1s ease infinite',
   },
   errorPanel: {
-    position: 'absolute', inset: 0, zIndex: 10, background: 'rgba(0,0,0,0.88)',
+    position: 'absolute', inset: 0, zIndex: 15, background: 'rgba(0,0,0,0.88)',
+    pointerEvents: 'auto',
     display: 'flex', flexDirection: 'column', justifyContent: 'center',
     alignItems: 'center', padding: 32, textAlign: 'center', gap: 16,
   },
@@ -580,19 +591,23 @@ const s = {
     color: 'rgba(255,255,255,0.65)',
   },
   bottomBar: {
-    position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 5,
+    position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 8,
     padding: '18px 24px calc(34px + env(safe-area-inset-bottom, 0px))',
-    background: 'linear-gradient(to top, rgba(0,0,0,0.85), transparent)',
+    background: 'linear-gradient(to top, rgba(0,0,0,0.85) 60%, transparent)',
     display: 'flex', flexDirection: 'column', gap: 16,
+    pointerEvents: 'auto',
   },
   modeRow: {
     display: 'flex', justifyContent: 'center', gap: 6,
+    pointerEvents: 'auto',
   },
   modeBtn: {
     padding: '8px 18px', background: 'rgba(255,255,255,0.08)',
     color: 'rgba(255,255,255,0.55)', border: '1px solid rgba(255,255,255,0.12)',
     borderRadius: 999, fontFamily: 'inherit', fontSize: '0.7rem',
     letterSpacing: '0.12em', textTransform: 'uppercase', cursor: 'pointer',
+    WebkitTapHighlightColor: 'transparent',
+    pointerEvents: 'auto',
   },
   modeBtnActive: {
     background: 'rgba(0,240,255,0.14)', borderColor: 'rgba(0,240,255,0.5)',
@@ -608,6 +623,9 @@ const s = {
     background: 'rgba(255,255,255,0.08)', border: '3px solid #fff',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     cursor: 'pointer', padding: 0, flexShrink: 0,
+    pointerEvents: 'auto',
+    WebkitTapHighlightColor: 'transparent',
+    touchAction: 'manipulation',
   },
   shutterRecording: { borderColor: '#ff3366' },
   shutterInner: {
@@ -623,6 +641,9 @@ const s = {
     display: 'flex', flexDirection: 'column', alignItems: 'center',
     justifyContent: 'center', gap: 2, padding: 0, flexShrink: 0,
     boxShadow: '0 0 20px rgba(0,240,255,0.15)',
+    pointerEvents: 'auto',
+    WebkitTapHighlightColor: 'transparent',
+    touchAction: 'manipulation',
   },
   flipLabel: {
     fontSize: '0.5rem', letterSpacing: '0.08em', textTransform: 'uppercase',
@@ -630,16 +651,21 @@ const s = {
   },
   previewActions: {
     display: 'flex', gap: 12, justifyContent: 'center',
+    pointerEvents: 'auto',
   },
   btnGhost: {
     padding: '12px 24px', background: 'rgba(255,255,255,0.08)',
     color: '#fff', border: '1px solid rgba(255,255,255,0.2)',
     borderRadius: 999, fontFamily: 'inherit', fontSize: '0.78rem',
     letterSpacing: '0.08em', cursor: 'pointer', minWidth: 120,
+    pointerEvents: 'auto', WebkitTapHighlightColor: 'transparent',
+    touchAction: 'manipulation',
   },
   btnPrimary: {
     padding: '12px 24px', background: '#00ff88', color: '#05050f',
     border: 'none', borderRadius: 999, fontFamily: 'inherit', fontSize: '0.78rem',
     fontWeight: 700, letterSpacing: '0.08em', cursor: 'pointer', minWidth: 120,
+    pointerEvents: 'auto', WebkitTapHighlightColor: 'transparent',
+    touchAction: 'manipulation',
   },
 };
