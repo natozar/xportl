@@ -28,16 +28,22 @@ export default function ARScene({ capsules, pings, onCapsuleClick, onVortexClick
 
     const tryInit = () => {
       if (cancelled) return;
-      // aframe.min.js sets window.AFRAME; aframe-ar.js registers the `arjs`
-      // component under AFRAME.components. Without both, a-scene mounts but
-      // never opens the camera — user stares at a black screen forever.
+      // aframe.min.js sets window.AFRAME. aframe-ar.js registers the
+      // gps-camera / gps-entity-place components (arjs itself is a SYSTEM,
+      // not a component, so checking AFRAME.components.arjs always fails).
+      // gps-camera is the concrete thing our scene depends on, so waiting
+      // for it is both accurate and semantically what we actually need.
       const aframeReady = typeof window !== 'undefined' && !!window.AFRAME;
-      const arjsReady = aframeReady && !!window.AFRAME.components?.arjs;
+      const gpsReady = aframeReady && !!window.AFRAME.components?.['gps-camera'];
 
-      if (!aframeReady || !arjsReady) {
+      if (!aframeReady || !gpsReady) {
         attempts += 1;
-        if (attempts > 50) {
-          console.error('[XPortl] AR.js scripts failed to load after 10s');
+        if (attempts > 75) {
+          console.error(
+            '[XPortl] AR.js scripts failed to load after 15s. ' +
+            'AFRAME:', !!window.AFRAME,
+            'gps-camera component:', !!window.AFRAME?.components?.['gps-camera']
+          );
           return;
         }
         setTimeout(tryInit, 200);
