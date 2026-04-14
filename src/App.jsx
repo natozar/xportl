@@ -54,33 +54,64 @@ export default function App() {
   const [reportTarget, setReportTarget] = useState(null);
   const scanVersion = useRef(0);
 
-  // ── Auth listener (single source of truth) ──
+  // ── Auth listener ──
   useEffect(() => {
-    // onAuthStateChange is the ONLY source of truth.
-    // It fires INITIAL_SESSION on subscribe (handles URL hash tokens from OAuth redirect),
-    // then SIGNED_IN / SIGNED_OUT / TOKEN_REFRESHED for subsequent changes.
-    // We do NOT call getSession() separately to avoid race conditions.
+    let resolved = false;
 
+    // Step 1: Subscribe to auth changes.
+    // onAuthStateChange fires INITIAL_SESSION, SIGNED_IN, SIGNED_OUT, TOKEN_REFRESHED.
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, s) => {
-      console.log('[XPortl Auth]', event, s?.user?.email ?? 'no user');
+      console.log('[XPortl Auth] Event:', event, '| User:', s?.user?.email ?? 'none', '| Hash in URL:', window.location.hash.includes('access_token'));
 
-      if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-        setSession(s);
-      } else if (event === 'SIGNED_OUT') {
+      resolved = true;
+
+      if (event === 'SIGNED_OUT') {
         setSession(null);
         setProfile(null);
         setBlocked(null);
         setShowTos(false);
         setShowDisclaimer(false);
         setReady(false);
+        return;
       }
+
+      // For INITIAL_SESSION: s can be null if no stored session AND no hash tokens.
+      // For SIGNED_IN / TOKEN_REFRESHED: s is always the valid session.
+      setSession(s);
     });
 
-    // Safety net: if onAuthStateChange doesn't fire within 3s (e.g. no hash, no stored session),
-    // resolve the loading state so we show AuthGate instead of infinite blank screen.
+    // Step 2: Fallback — if INITIAL_SESSION fires with null but there ARE hash tokens,
+    // the Supabase client might still be processing them. Poll getSession() briefly.
+    const hasHashTokens = window.location.hash.includes('access_token');
+
+    if (hasHashTokens) {
+      console.log('[XPortl Auth] OAuth hash tokens detected, waiting for processing...');
+      // Give Supabase time to process the hash and fire SIGNED_IN
+      const pollInterval = setInterval(async () => {
+        const { data: { session: s } } = await supabase.auth.getSession();
+        if (s) {
+          console.log('[XPortl Auth] Session recovered from hash:', s.user.email);
+          setSession(s);
+          clearInterval(pollInterval);
+          // Clean hash from URL
+          window.history.replaceState(null, '', window.location.pathname);
+        }
+      }, 500);
+
+      // Stop polling after 5s
+      setTimeout(() => clearInterval(pollInterval), 5000);
+    }
+
+    // Step 3: Safety net — never stay on loading screen forever
     const timeout = setTimeout(() => {
-      setSession((prev) => (prev === undefined ? null : prev));
-    }, 3000);
+      if (!resolved) {
+        console.warn('[XPortl Auth] No auth event after 4s, checking session directly...');
+        supabase.auth.getSession().then(({ data: { session: s } }) => {
+          console.log('[XPortl Auth] Direct session check:', s?.user?.email ?? 'none');
+          setSession(s ?? null);
+        });
+      }
+    }, 4000);
 
     return () => {
       subscription.unsubscribe();
