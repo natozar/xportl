@@ -12,6 +12,9 @@ import VortexModal from './components/VortexModal';
 import VibePing from './components/VibePing';
 import ReportModal from './components/ReportModal';
 import InstallPrompt from './components/InstallPrompt';
+import BottomNav from './components/BottomNav';
+import ProfilePage from './components/ProfilePage';
+import SettingsPage from './components/SettingsPage';
 import { useGeolocation } from './hooks/useGeolocation';
 import { useCamera } from './hooks/useCamera';
 import { usePwaInstall } from './hooks/usePwaInstall';
@@ -75,6 +78,8 @@ export default function App() {
   const [selectedVortex, setSelectedVortex] = useState(null);
   const [activePings, setActivePings] = useState([]);
   const [reportTarget, setReportTarget] = useState(null);
+  const [activeTab, setActiveTab] = useState('explore'); // explore | create | profile
+  const [showSettings, setShowSettings] = useState(false);
   const scanVersion = useRef(0);
 
   // ── Auth listener ──
@@ -506,28 +511,65 @@ export default function App() {
   // 6. Camera/GPS permissions
   if (!ready) return <PermissionGate geo={geo} cam={cam} onComplete={() => setReady(true)} />;
 
+  // ── Tab handler (Create tab opens the creation panel via explore view) ──
+  const handleTabChange = (tab) => {
+    setShowSettings(false);
+    if (tab === 'create') {
+      setActiveTab('explore'); // Stay on AR view
+      // The LeaveTraceButton will be triggered to open by a ref/callback
+      window.dispatchEvent(new CustomEvent('xportl:open-create'));
+    } else {
+      setActiveTab(tab);
+    }
+  };
+
+  const refreshProfile = async () => {
+    if (session?.user?.id) {
+      const p = await getProfile(session.user.id);
+      if (p) setProfile(p);
+    }
+  };
+
   // 7. Main app
   return (
     <div className="scanlines" style={styles.root}>
+      {/* AR scene always mounted (camera stays live even on profile tab) */}
       <ARScene capsules={nearbyCapsules} pings={activePings} onCapsuleClick={handleCapsuleClick} onVortexClick={handleVortexClick} />
 
-      {/* PWA Install Prompt (non-blocking overlay) */}
-      {pwa.canInstall && (
-        <InstallPrompt
-          isIos={pwa.isIos}
-          isAndroid={pwa.isAndroid}
-          onInstall={pwa.install}
-          onDismiss={pwa.dismiss}
+      {/* ── Tab: Explore (AR overlay) ── */}
+      {activeTab === 'explore' && (
+        <>
+          {pwa.canInstall && (
+            <InstallPrompt isIos={pwa.isIos} isAndroid={pwa.isAndroid} onInstall={pwa.install} onDismiss={pwa.dismiss} />
+          )}
+
+          <div style={styles.overlay}>
+            <Radar lat={geo.lat} lng={geo.lng} altitude={geo.altitude} nearbyCount={nearbyCapsules.length} />
+            <LeaveTraceButton onPress={handleLeaveTrace} saving={saving} />
+            <VibePing onPing={handleVibePing} />
+          </div>
+        </>
+      )}
+
+      {/* ── Tab: Profile ── */}
+      {activeTab === 'profile' && !showSettings && (
+        <ProfilePage
+          session={session}
+          profile={profile}
+          onOpenSettings={() => setShowSettings(true)}
+          onRefreshProfile={refreshProfile}
         />
       )}
 
-      <div style={styles.overlay}>
-        <Radar lat={geo.lat} lng={geo.lng} altitude={geo.altitude} nearbyCount={nearbyCapsules.length} />
-        <DebugPanel geo={geo} nearbyCapsules={nearbyCapsules} lastScan={lastScan} supabaseOk={supabaseOk} />
-        <LeaveTraceButton onPress={handleLeaveTrace} saving={saving} />
-        <VibePing onPing={handleVibePing} />
-      </div>
+      {/* ── Settings (sub-page of profile) ── */}
+      {showSettings && (
+        <SettingsPage session={session} onBack={() => setShowSettings(false)} />
+      )}
 
+      {/* ── Bottom Navigation (always visible) ── */}
+      <BottomNav activeTab={activeTab} onTabChange={handleTabChange} />
+
+      {/* ── Modals (render on top of everything) ── */}
       <CapsuleModal
         capsule={selectedCapsule}
         onClose={() => setSelectedCapsule(null)}

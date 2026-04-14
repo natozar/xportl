@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useMediaCapture } from '../hooks/useMediaCapture';
 import { preloadNsfwModel } from '../services/nsfwFilter';
 import CameraModal from './CameraModal';
@@ -23,6 +23,13 @@ export default function LeaveTraceButton({ onPress, saving }) {
   const [message, setMessage] = useState(DEFAULT_MESSAGE);
   const [cameraOpen, setCameraOpen] = useState(null); // null | 'photo' | 'video'
   const { media, recording, scanning, moderationError, acceptCapturedMedia, startAudioRecording, stopAudioRecording, clearMedia, dismissModerationError } = useMediaCapture();
+
+  // Listen for "Create" tab tap from BottomNav
+  useEffect(() => {
+    const handler = () => { setPanelOpen(true); preloadNsfwModel(); };
+    window.addEventListener('xportl:open-create', handler);
+    return () => window.removeEventListener('xportl:open-create', handler);
+  }, []);
 
   const currentType = TYPES[capsuleType];
 
@@ -305,7 +312,7 @@ export default function LeaveTraceButton({ onPress, saving }) {
 
 const st = {
   fab: {
-    position: 'fixed', bottom: 'calc(32px + env(safe-area-inset-bottom, 0px))',
+    position: 'fixed', bottom: 'calc(76px + env(safe-area-inset-bottom, 0px))',
     left: '50%', transform: 'translateX(-50%)',
     zIndex: 35, pointerEvents: 'auto', width: 56, height: 56, borderRadius: '50%',
     background: 'rgba(0,255,136,0.12)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
@@ -314,7 +321,7 @@ const st = {
     boxShadow: '0 0 30px rgba(0,255,136,0.15)',
   },
   toast: {
-    position: 'fixed', bottom: 'calc(100px + env(safe-area-inset-bottom, 0px))',
+    position: 'fixed', bottom: 'calc(140px + env(safe-area-inset-bottom, 0px))',
     left: '50%', transform: 'translateX(-50%)',
     zIndex: 40, pointerEvents: 'none',
   },
