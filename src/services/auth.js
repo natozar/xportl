@@ -2,14 +2,23 @@ import { supabase } from './supabase';
 
 const TOS_VERSION = '1.0.0';
 
+/**
+ * Dynamic redirect URL — always uses the current domain.
+ * Works on localhost, ngrok, vercel, custom domain — zero hardcode.
+ */
+function getRedirectUrl() {
+  const url = window.location.origin;
+  console.log('[XPortl Auth] Redirect URL:', url);
+  return url;
+}
+
 // ── OAuth ──
 
 export async function signInWithGoogle() {
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: 'google',
     options: {
-      redirectTo: window.location.origin + '/',
-      skipBrowserRedirect: false,
+      redirectTo: getRedirectUrl(),
     },
   });
   if (error) throw error;
@@ -22,7 +31,7 @@ export async function signUpWithEmail(email, password) {
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
-    options: { emailRedirectTo: window.location.origin },
+    options: { emailRedirectTo: getRedirectUrl() },
   });
   if (error) throw error;
   return data;
