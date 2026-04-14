@@ -2,13 +2,18 @@
 <html lang="pt-BR">
 <head>
 <script>
-  // OAuth safety net: legacy Supabase redirects (or email confirmation links
-  // issued before the /app split) land on /#access_token=... Bounce them to
-  // /app so the Supabase client can actually capture the session.
+  // OAuth safety net: PKCE flow returns ?code=... in the query; the legacy
+  // implicit flow returned #access_token=... in the hash. Either way, if the
+  // redirect lands on the static LP (because Supabase Redirect URLs still
+  // point at the root, or the link is from before the /app split), bounce
+  // to /app preserving both search and hash so the Supabase client can
+  // actually consume it.
   (function () {
-    var h = location.hash;
-    if (h && (h.indexOf('access_token') !== -1 || h.indexOf('error') !== -1)) {
-      location.replace('/app' + h);
+    var s = location.search, h = location.hash;
+    var hasCode = s.indexOf('code=') !== -1 || s.indexOf('error=') !== -1;
+    var hasHashToken = h.indexOf('access_token') !== -1 || h.indexOf('error') !== -1;
+    if (hasCode || hasHashToken) {
+      location.replace('/app' + s + h);
     }
   })();
 </script>
