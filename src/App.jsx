@@ -15,7 +15,7 @@ import InstallPrompt from './components/InstallPrompt';
 import { useGeolocation } from './hooks/useGeolocation';
 import { useCamera } from './hooks/useCamera';
 import { usePwaInstall } from './hooks/usePwaInstall';
-import { createCapsule, getNearbyCapsules } from './services/capsules';
+import { createCapsule, getNearbyCapsules, subscribeToCapsuleChanges, haversineDistance } from './services/capsules';
 import { createPing } from './services/pings';
 import { clusterCapsules } from './services/clustering';
 import { uploadMedia } from './services/storage';
@@ -26,8 +26,15 @@ import {
 } from './services/auth';
 import { validateContent, checkRateLimit, checkRestrictedZone, logAccess } from './services/moderation';
 
-const SCAN_INTERVAL = 10_000;
+// Polling is now just a safety net behind the realtime subscription — if the
+// websocket drops or a change arrives while unfocused, the next poll catches
+// it. 30s is plenty when realtime is doing the heavy lifting.
+const SCAN_INTERVAL = 30_000;
 const SCAN_RADIUS = 50;
+
+function isCapsuleVisible(c) {
+  return !c.moderation_status || c.moderation_status === 'active';
+}
 
 export default function App() {
   // ── Auth state ──
@@ -194,7 +201,7 @@ export default function App() {
     }
   }, [permissionsGranted, legalGatesCleared]);
 
-  // ── Polling ──
+  // ── Polling (safety net) ──
   useEffect(() => {
     if (!ready || geo.lat === null || geo.lng === null) return;
     let cancelled = false;
@@ -203,8 +210,7 @@ export default function App() {
       try {
         const results = await getNearbyCapsules(geo.lat, geo.lng, SCAN_RADIUS);
         if (cancelled) return;
-        // Filter out removed/under_review capsules
-        setNearbyCapsules(results.filter((c) => !c.moderation_status || c.moderation_status === 'active'));
+        setNearbyCapsules(results.filter(isCapsuleVisible));
         setLastScan(new Date().toLocaleTimeString('pt-BR'));
         setSupabaseOk(true);
       } catch (err) {
@@ -218,6 +224,58 @@ export default function App() {
     const interval = setInterval(scan, SCAN_INTERVAL);
     return () => { cancelled = true; clearInterval(interval); };
   }, [ready, geo.lat, geo.lng, scanVersion.current]);
+
+  // ── Realtime subscription ──
+  // Merges new / updated / deleted capsules into state without waiting for
+  // the next poll. Proximity + moderation filtering happens client-side since
+  // postgres_changes doesn't support geo predicates.
+  useEffect(() => {
+    if (!ready || geo.lat === null || geo.lng === null) return;
+
+    const lat = geo.lat;
+    const lng = geo.lng;
+
+    const unsubscribe = subscribeToCapsuleChanges({
+      onInsert: (row) => {
+        if (!isCapsuleVisible(row)) return;
+        const distance = haversineDistance(lat, lng, row.lat, row.lng);
+        if (distance > SCAN_RADIUS) return;
+        setNearbyCapsules((prev) => {
+          if (prev.some((c) => c.id === row.id)) return prev;
+          return [...prev, { ...row, distance_meters: distance }]
+            .sort((a, b) => a.distance_meters - b.distance_meters);
+        });
+        setLastScan(new Date().toLocaleTimeString('pt-BR'));
+      },
+      onUpdate: (row) => {
+        setNearbyCapsules((prev) => {
+          const idx = prev.findIndex((c) => c.id === row.id);
+          // Row just entered the visible set (moderation flipped to active,
+          // previously filtered out) — treat like an insert if in range.
+          if (idx === -1) {
+            if (!isCapsuleVisible(row)) return prev;
+            const distance = haversineDistance(lat, lng, row.lat, row.lng);
+            if (distance > SCAN_RADIUS) return prev;
+            return [...prev, { ...row, distance_meters: distance }]
+              .sort((a, b) => a.distance_meters - b.distance_meters);
+          }
+          // Row left the visible set (banned, removed, etc.)
+          if (!isCapsuleVisible(row)) {
+            return prev.filter((c) => c.id !== row.id);
+          }
+          // In-place update (views_left decrement, etc.)
+          const next = prev.slice();
+          next[idx] = { ...next[idx], ...row };
+          return next;
+        });
+      },
+      onDelete: (row) => {
+        setNearbyCapsules((prev) => prev.filter((c) => c.id !== row.id));
+      },
+    });
+
+    return unsubscribe;
+  }, [ready, geo.lat, geo.lng]);
 
   // ── Leave Trace (with all compliance checks) ──
   const handleLeaveTrace = useCallback(async ({ unlockDate, mediaBlob, mediaType, viewsLeft, visibilityLayer }) => {

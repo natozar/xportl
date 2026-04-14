@@ -185,3 +185,38 @@ export async function getNearbyCapsules(lat, lng, radiusMeters = 50) {
 }
 
 export { haversineDistance };
+
+/**
+ * Subscribe to realtime changes on the capsules table. The handlers receive
+ * raw rows — the caller is responsible for filtering by radius, moderation,
+ * layer, etc. Returns an unsubscribe function.
+ *
+ * Requires the table to be added to the realtime publication:
+ *   alter publication supabase_realtime add table capsules;
+ */
+export function subscribeToCapsuleChanges({ onInsert, onUpdate, onDelete } = {}) {
+  if (!isSupabaseConfigured()) return () => {};
+
+  const channel = supabase
+    .channel('capsules-realtime')
+    .on(
+      'postgres_changes',
+      { event: 'INSERT', schema: 'public', table: 'capsules' },
+      (payload) => onInsert && onInsert(payload.new)
+    )
+    .on(
+      'postgres_changes',
+      { event: 'UPDATE', schema: 'public', table: 'capsules' },
+      (payload) => onUpdate && onUpdate(payload.new, payload.old)
+    )
+    .on(
+      'postgres_changes',
+      { event: 'DELETE', schema: 'public', table: 'capsules' },
+      (payload) => onDelete && onDelete(payload.old)
+    )
+    .subscribe();
+
+  return () => {
+    supabase.removeChannel(channel);
+  };
+}
