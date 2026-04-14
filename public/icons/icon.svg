@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- Background with subtle radial glow -->
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="45%" r="60%">
+      <stop offset="0%" stop-color="#1a1530"/>
+      <stop offset="60%" stop-color="#0d0a1a"/>
+      <stop offset="100%" stop-color="#06040d"/>
+    </radialGradient>
+    <radialGradient id="portalCore" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#00f0ff" stop-opacity="0.95"/>
+      <stop offset="60%" stop-color="#00f0ff" stop-opacity="0.25"/>
+      <stop offset="100%" stop-color="#00f0ff" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="ringOuter" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00f0ff"/>
+      <stop offset="100%" stop-color="#b44aff"/>
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="6" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <!-- Rounded square base -->
+  <rect width="512" height="512" rx="100" ry="100" fill="url(#bg)"/>
+
+  <!-- Outer portal ring -->
+  <circle cx="256" cy="256" r="170" fill="none" stroke="url(#ringOuter)" stroke-width="6" opacity="0.85"/>
+
+  <!-- Mid portal ring -->
+  <circle cx="256" cy="256" r="125" fill="none" stroke="#b44aff" stroke-width="3" opacity="0.55"/>
+
+  <!-- Inner accent ring -->
+  <circle cx="256" cy="256" r="85" fill="none" stroke="#ff6b2b" stroke-width="2.5" opacity="0.65"/>
+
+  <!-- Portal core glow -->
+  <circle cx="256" cy="256" r="70" fill="url(#portalCore)" filter="url(#glow)"/>
+  <circle cx="256" cy="256" r="22" fill="#00f0ff" opacity="0.95" filter="url(#glow)"/>
+
+  <!-- X glyph -->
+  <g stroke="#0d0a1a" stroke-width="14" stroke-linecap="round" opacity="0.92">
+    <line x1="232" y1="232" x2="280" y2="280"/>
+    <line x1="280" y1="232" x2="232" y2="280"/>
+  </g>
+  <g stroke="#ffffff" stroke-width="6" stroke-linecap="round" opacity="0.95">
+    <line x1="232" y1="232" x2="280" y2="280"/>
+    <line x1="280" y1="232" x2="232" y2="280"/>
+  </g>
+</svg>

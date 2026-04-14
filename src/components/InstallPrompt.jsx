@@ -155,7 +155,7 @@ const s = {
   },
   installBtn: {
     width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center',
-    padding: '15px 24px', borderRadius: 16, border: 'none',
+    padding: '15px 24px', borderRadius: 16,
     background: 'rgba(0, 240, 255, 0.12)',
     border: '1px solid rgba(0, 240, 255, 0.25)',
     color: '#00f0ff', fontSize: '0.85rem', fontWeight: 700,

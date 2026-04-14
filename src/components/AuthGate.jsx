@@ -343,7 +343,7 @@ const s = {
     color: '#00f0ff', fontSize: '0.8rem', fontWeight: 700, flexShrink: 0,
   },
   submitBtn: {
-    width: '100%', padding: '14px', borderRadius: 14, border: 'none',
+    width: '100%', padding: '14px', borderRadius: 14,
     background: 'rgba(0,240,255,0.12)', color: '#00f0ff',
     fontSize: '0.8rem', fontWeight: 700, fontFamily: 'inherit',
     border: '1px solid rgba(0,240,255,0.2)',
