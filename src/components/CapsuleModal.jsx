@@ -1,7 +1,9 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { isCapsuleLocked, isGhostCapsule, getTimeRemaining, haptic, consumeView, selfDestruct } from '../services/capsules';
+import { shareCapsule } from '../services/share';
 
 export default function CapsuleModal({ capsule, onClose, onSelfDestruct, onReport }) {
+  const [shareStatus, setShareStatus] = useState(null);
   const [viewsLeft, setViewsLeft] = useState(null);
   const [destroying, setDestroying] = useState(false);
   const [audioPlaying, setAudioPlaying] = useState(false);
@@ -231,6 +233,19 @@ export default function CapsuleModal({ capsule, onClose, onSelfDestruct, onRepor
           {capsule.created_at && (
             <span style={st.metaChip}>{new Date(capsule.created_at).toLocaleDateString('pt-BR')}</span>
           )}
+          {/* Share button */}
+          {!locked && (
+            <button
+              style={st.shareBtn}
+              onClick={async () => {
+                const result = await shareCapsule(capsule);
+                setShareStatus(result.method === 'clipboard' ? 'Link copiado!' : null);
+                if (result.method === 'clipboard') setTimeout(() => setShareStatus(null), 2000);
+              }}
+            >
+              {shareStatus || 'Compartilhar'}
+            </button>
+          )}
           {onReport && !locked && (
             <button
               style={st.reportBtn}
@@ -324,8 +339,13 @@ const st = {
   // ── Meta ──
   meta: { display: 'flex', gap: 8, marginTop: 14, paddingTop: 12, borderTop: '1px solid rgba(255,255,255,0.03)' },
   metaChip: { fontSize: '0.5rem', color: '#6b6b80', background: 'rgba(255,255,255,0.03)', padding: '3px 8px', borderRadius: 6 },
+  shareBtn: {
+    marginLeft: 'auto', fontSize: '0.5rem', color: 'rgba(0,240,255,0.5)', background: 'none',
+    border: '1px solid rgba(0,240,255,0.12)', borderRadius: 6, padding: '3px 10px',
+    fontFamily: 'inherit', fontWeight: 600, letterSpacing: '0.05em',
+  },
   reportBtn: {
-    marginLeft: 'auto', fontSize: '0.5rem', color: 'rgba(255,51,102,0.5)', background: 'none',
+    fontSize: '0.5rem', color: 'rgba(255,51,102,0.5)', background: 'none',
     border: '1px solid rgba(255,51,102,0.12)', borderRadius: 6, padding: '3px 10px',
     fontFamily: 'inherit', fontWeight: 600, letterSpacing: '0.05em',
   },

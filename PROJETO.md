@@ -131,32 +131,29 @@ Apenas 2 variaveis. Configurar tambem na Vercel (Environment Variables).
 
 ## PROXIMAS ETAPAS (PRIORIDADE)
 
-### P0 — Bugs Criticos (fazer agora)
+### P0 — Bugs Criticos (RESOLVIDOS)
 
-- [ ] **Shadowban nao aplicado na leitura**: `account_status = 'shadowbanned'`
-  faz capsulas visiveis so para o autor, mas nao ha filtro no `getNearbyCapsules`.
-  Solucao: Adicionar `WHERE created_by = current_user OR moderation_status = 'active'`
-  no RPC ou filtrar client-side.
+- [x] **Shadowban filtrado na leitura**: migration_008 atualiza RPC com
+  LEFT JOIN user_profiles. Capsulas de shadowbanned sao invisiveis exceto
+  para o proprio autor. Client fallback tambem filtra moderation_status.
 
-- [ ] **Email nao verificado permite criar conteudo**: Supabase envia link de
-  confirmacao mas o app nao checa `email_confirmed_at`. Solucao: Verificar no
-  profile load e mostrar tela "confirme seu e-mail" antes de prosseguir.
+- [x] **Email verificado obrigatorio**: App.jsx checa email_confirmed_at
+  para signups por email. OAuth (Google) ignora (sempre verificado).
+  Tela "confirme seu e-mail" bloqueia acesso ate confirmacao.
 
-- [ ] **Geofence so no frontend**: O check de zona restrita roda apenas no
-  client. Alguem com curl pode bypassar. Solucao: Adicionar validacao no
-  insert trigger ou RPC do Supabase.
+- [x] **Geofence server-side**: migration_009 adiciona BEFORE INSERT trigger
+  que valida coordenadas contra restricted_zones. API direta bloqueada.
 
-### P1 — Qualidade (proxima sprint)
+### P1 — Qualidade (RESOLVIDOS)
 
-- [ ] **Texto customizado na capsula**: O campo de mensagem existe no
-  LeaveTraceButton mas o App.jsx ainda hardcoda 'Estive aqui!' em alguns paths.
-  Unificar para sempre usar o texto digitado pelo usuario.
+- [x] **Texto customizado**: Ja estava unificado — App.jsx usa `message`
+  do LeaveTraceButton com fallback 'Estive aqui!' so se vazio.
 
-- [ ] **Restricoes de menores (ECA)**: `is_minor` existe na tabela mas nao e
-  consultado no fluxo de criacao. Implementar: sem midia, sem ghost, max 5/dia.
+- [x] **Restricoes de menores (ECA)**: getMinorRestrictions() agora chamada
+  antes de criar capsula. Bloqueia midia e ghost para is_minor.
 
-- [ ] **Rate limits configuráveis**: Atualmente hardcoded em moderation.js.
-  Mover para feature_flags para ajuste sem deploy.
+- [x] **Rate limits configuraveis**: checkRateLimit() le feature_flags
+  (key: rate_limits) com cache 5min. Fallback para defaults hardcoded.
 
 - [ ] **Passkey enrollment no Godmode**: Schema de WebAuthn pronto, falta UI
   para registrar credenciais e verificar no login do admin.

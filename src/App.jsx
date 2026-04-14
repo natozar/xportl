@@ -18,6 +18,7 @@ import { usePwaInstall } from './hooks/usePwaInstall';
 import { createCapsule, getNearbyCapsules, subscribeToCapsuleChanges, haversineDistance } from './services/capsules';
 import { createPing } from './services/pings';
 import { clusterCapsules } from './services/clustering';
+import { decodeShareToken } from './services/share';
 import { uploadMedia } from './services/storage';
 import { supabase } from './services/supabase';
 import {
@@ -249,6 +250,21 @@ export default function App() {
     const interval = setInterval(scan, SCAN_INTERVAL);
     return () => { cancelled = true; clearInterval(interval); };
   }, [ready, geo.lat, geo.lng, scanVersion.current]);
+
+  // ── Shared capsule link detection ──
+  useEffect(() => {
+    if (!ready) return;
+    const shared = decodeShareToken();
+    if (shared) {
+      // Clean the hash so the token doesn't persist
+      window.history.replaceState(null, '', window.location.pathname);
+      // Fetch the capsule and open it
+      (async () => {
+        const { data } = await supabase.from('capsules').select('*').eq('id', shared.id).single();
+        if (data) setSelectedCapsule({ ...data, distance_meters: 0 });
+      })();
+    }
+  }, [ready]);
 
   // ── Realtime subscription ──
   // Merges new / updated / deleted capsules into state without waiting for
