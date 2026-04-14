@@ -1,6 +1,16 @@
 import { supabase } from './supabase';
 import { deleteMedia } from './storage';
 
+// The RPC get_nearby_capsules doesn't include media_type in its RETURNS
+// TABLE list, so we infer it from the media_url extension on the way out.
+// Works for anything the capture hook produces (webm audio, webp images).
+function inferMediaType(url) {
+  if (!url) return null;
+  if (/\.(webm|mp3|ogg|wav|m4a|aac)(\?|$)/i.test(url)) return 'audio';
+  if (/\.(webp|jpg|jpeg|png|gif|avif)(\?|$)/i.test(url)) return 'image';
+  return null;
+}
+
 function haversineDistance(lat1, lng1, lat2, lng2) {
   const R = 6371000;
   const toRad = (deg) => (deg * Math.PI) / 180;
@@ -157,6 +167,7 @@ export async function getNearbyCapsules(lat, lng, radiusMeters = 50) {
   if (!rpcError && rpcData) {
     return rpcData.map((c) => ({
       ...c,
+      media_type: c.media_type || inferMediaType(c.media_url),
       distance_meters: c.distance_meters ?? haversineDistance(lat, lng, c.lat, c.lng),
     }));
   }
@@ -179,7 +190,11 @@ export async function getNearbyCapsules(lat, lng, radiusMeters = 50) {
       if (c.views_left !== null && c.views_left <= 0) return false;
       return true;
     })
-    .map((c) => ({ ...c, distance_meters: haversineDistance(lat, lng, c.lat, c.lng) }))
+    .map((c) => ({
+      ...c,
+      media_type: c.media_type || inferMediaType(c.media_url),
+      distance_meters: haversineDistance(lat, lng, c.lat, c.lng),
+    }))
     .filter((c) => c.distance_meters <= radiusMeters)
     .sort((a, b) => a.distance_meters - b.distance_meters);
 }
