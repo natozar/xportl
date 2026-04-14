@@ -11,6 +11,8 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.103.0",
+    "@tensorflow/tfjs": "^4.22.0",
+    "nsfwjs": "^4.3.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0"
   },

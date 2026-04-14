@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useMediaCapture } from '../hooks/useMediaCapture';
+import { preloadNsfwModel } from '../services/nsfwFilter';
 
 const GHOST_VIEW_OPTIONS = [5, 10, 50];
 
@@ -15,7 +16,7 @@ export default function LeaveTraceButton({ onPress, saving }) {
   const [feedback, setFeedback] = useState(null);
   const [capsuleType, setCapsuleType] = useState('perpetual');
   const [ghostViews, setGhostViews] = useState(10);
-  const { media, recording, capturePhoto, startAudioRecording, stopAudioRecording, clearMedia } = useMediaCapture();
+  const { media, recording, scanning, moderationError, capturePhoto, startAudioRecording, stopAudioRecording, clearMedia, dismissModerationError } = useMediaCapture();
 
   const currentType = TYPES[capsuleType];
 
@@ -152,10 +153,39 @@ export default function LeaveTraceButton({ onPress, saving }) {
               </div>
             )}
 
+            {/* ── NSFW / Moderation alert ── */}
+            {moderationError && (
+              <div style={st.nsfwAlert}>
+                <div style={st.nsfwAlertHeader}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                    <path d="M12 2L2 22h20L12 2z" stroke="#ff3366" strokeWidth="1.5" fill="rgba(255,51,102,0.1)" />
+                    <line x1="12" y1="9" x2="12" y2="14" stroke="#ff3366" strokeWidth="2" strokeLinecap="round" />
+                    <circle cx="12" cy="17" r="1" fill="#ff3366" />
+                  </svg>
+                  <span style={st.nsfwAlertTitle}>CONTEUDO BLOQUEADO</span>
+                  <button style={st.nsfwDismiss} onClick={dismissModerationError}>
+                    <svg width="10" height="10" viewBox="0 0 16 16" fill="none">
+                      <line x1="3" y1="3" x2="13" y2="13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                      <line x1="13" y1="3" x2="3" y2="13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                    </svg>
+                  </button>
+                </div>
+                <p style={st.nsfwAlertText}>{moderationError}</p>
+              </div>
+            )}
+
+            {/* ── AI Scanning indicator ── */}
+            {scanning && (
+              <div style={st.scanningBar}>
+                <div style={st.scanningSpinner} />
+                <span style={st.scanningText}>Escaneando imagem com IA...</span>
+              </div>
+            )}
+
             {/* ── Media attachments ── */}
             <div style={st.sectionLabel}>ANEXAR MIDIA</div>
             <div style={st.mediaRow}>
-              <button style={st.mediaBtn} onClick={capturePhoto}>
+              <button style={{ ...st.mediaBtn, ...(scanning ? { opacity: 0.4, pointerEvents: 'none' } : {}) }} onClick={capturePhoto}>
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
                   <rect x="2" y="6" width="20" height="14" rx="3" stroke="currentColor" strokeWidth="1.5" />
                   <circle cx="12" cy="13" r="4" stroke="currentColor" strokeWidth="1.5" />
@@ -224,7 +254,7 @@ export default function LeaveTraceButton({ onPress, saving }) {
 
       {/* FAB */}
       {!panelOpen && !feedback && (
-        <button style={st.fab} onClick={() => setPanelOpen(true)}>
+        <button style={st.fab} onClick={() => { setPanelOpen(true); preloadNsfwModel(); }}>
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
             <line x1="12" y1="5" x2="12" y2="19" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
             <line x1="5" y1="12" x2="19" y2="12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
@@ -353,6 +383,40 @@ const st = {
   recDot: {
     width: 10, height: 10, borderRadius: '50%', background: '#ff3366',
     boxShadow: '0 0 8px rgba(255,51,102,0.6)', animation: 'pulse-ring 1s ease infinite',
+  },
+
+  // ── NSFW alert ──
+  nsfwAlert: {
+    padding: '12px 14px', marginBottom: 12, borderRadius: 12,
+    background: 'rgba(255,51,102,0.06)', border: '1px solid rgba(255,51,102,0.2)',
+  },
+  nsfwAlertHeader: {
+    display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6,
+  },
+  nsfwAlertTitle: {
+    flex: 1, fontSize: '0.6rem', fontWeight: 700, letterSpacing: '0.15em', color: '#ff3366',
+  },
+  nsfwDismiss: {
+    background: 'none', border: 'none', color: 'rgba(255,51,102,0.4)', padding: 4,
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+  },
+  nsfwAlertText: {
+    fontSize: '0.65rem', color: 'rgba(255,51,102,0.7)', lineHeight: 1.6,
+  },
+
+  // ── Scanning bar ──
+  scanningBar: {
+    display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px',
+    marginBottom: 12, borderRadius: 10,
+    background: 'rgba(0,240,255,0.04)', border: '1px solid rgba(0,240,255,0.1)',
+  },
+  scanningSpinner: {
+    width: 14, height: 14, border: '2px solid rgba(0,240,255,0.15)',
+    borderTopColor: '#00f0ff', borderRadius: '50%', animation: 'spin 0.6s linear infinite',
+    flexShrink: 0,
+  },
+  scanningText: {
+    fontSize: '0.62rem', color: 'rgba(0,240,255,0.6)', fontWeight: 600,
   },
 
   // ── Preview ──

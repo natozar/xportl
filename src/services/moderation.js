@@ -1,13 +1,21 @@
 import { supabase } from './supabase';
 
-// ── Banned words (pt-BR) — expandable ──
+// ── Banned words (pt-BR) — comprehensive ──
 const BANNED_PATTERNS = [
-  // Threats
-  /\b(vou\s+te\s+matar|vou\s+te\s+pegar|bomba|explosivo|ameaça\s+de\s+morte)\b/i,
-  // Racial slurs (abbreviated for privacy, expand in production)
-  /\b(macac[oa]|neguinh[oa]|crioul[oa])\b/i,
+  // Threats & violence
+  /\b(vou\s+te\s+matar|vou\s+te\s+pegar|vou\s+te\s+achar|bomba|explosivo|ameaça\s+de\s+morte|vou\s+te\s+esfaquear|vou\s+te\s+atirar)\b/i,
+  // Racial slurs
+  /\b(macac[oa]|neguinh[oa]|crioul[oa]|preto\s+imundo|brancel[oa]|chimpanze)\b/i,
+  // Homophobic slurs
+  /\b(viado|viad[oa]|bicha|bichona|sapatao|traveco|boiola)\b/i,
+  // Heavy insults / harassment
+  /\b(filh[oa]\s+da\s+puta|fdp|arrombad[oa]|desgraçad[oa]|corno\s+manso|vagabund[oa]|piranho|prostitut[oa]|lixo\s+humano|aborto\s+ambulante)\b/i,
+  // Sexual harassment
+  /\b(vou\s+te\s+comer|vou\s+te\s+estuprar|gostosa\s+do\s+caralho|manda\s+nudes|quer\s+transar)\b/i,
   // Panic/terrorism
-  /\b(atentado|terroris[tm]a|sequestro|tiroteio\s+aqui)\b/i,
+  /\b(atentado|terroris[tm]a|sequestro|tiroteio\s+aqui|alerta\s+de\s+bomba|jihad|vou\s+explodir)\b/i,
+  // Suicide/self-harm instigation
+  /\b(vai\s+se\s+matar|se\s+mata|suicid[ae]|deveria\s+morrer)\b/i,
 ];
 
 // ── PII detection (anti-doxxing) ──

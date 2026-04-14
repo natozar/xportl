@@ -52,7 +52,9 @@ export default defineConfig({
         ],
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
+        globPatterns: ['**/*.{css,html,svg,png,woff2}'],
+        globIgnores: ['**/group1-shard*', '**/tfjs*'],
+        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024, // 5MB
         navigateFallback: '/index.html',
         runtimeCaching: [
           {
@@ -75,6 +77,19 @@ export default defineConfig({
       },
     }),
   ],
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          // Isolate TensorFlow.js into its own lazy-loaded chunk
+          if (id.includes('@tensorflow') || id.includes('nsfwjs')) {
+            return 'nsfw-ai';
+          }
+        },
+      },
+    },
+    chunkSizeWarningLimit: 6000, // TF.js shards are large, suppress warning
+  },
   server: {
     https: true,
     host: true,
