@@ -30,7 +30,13 @@ begin
   end if;
 end $$;
 
-create or replace function public.get_nearby_capsules(
+-- CREATE OR REPLACE can't widen RETURNS TABLE, so drop first. Inside the
+-- transaction so a failure in the new definition rolls the drop back too.
+drop function if exists public.get_nearby_capsules(
+  double precision, double precision, integer, visibility_layer
+);
+
+create function public.get_nearby_capsules(
   user_lat double precision,
   user_lng double precision,
   radius_meters integer default 50,
