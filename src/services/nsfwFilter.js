@@ -28,7 +28,6 @@ async function getModel() {
       { size: 224 }
     );
 
-    console.log('[XPortl] NSFW model loaded');
     return nsfwModel;
   })();
 
