@@ -19,9 +19,38 @@ export default function ARScene({ capsules, pings, onCapsuleClick, onVortexClick
   const entitiesRef = useRef(new Map());
   const initializedRef = useRef(false);
 
-  // ── Build scene once ──
+  // ── Build scene once, but wait for AFRAME + AR.js scripts to load ──
   useEffect(() => {
     if (initializedRef.current || !sceneContainerRef.current) return;
+
+    let cancelled = false;
+    let attempts = 0;
+
+    const tryInit = () => {
+      if (cancelled) return;
+      // aframe.min.js sets window.AFRAME; aframe-ar.js registers the `arjs`
+      // component under AFRAME.components. Without both, a-scene mounts but
+      // never opens the camera — user stares at a black screen forever.
+      const aframeReady = typeof window !== 'undefined' && !!window.AFRAME;
+      const arjsReady = aframeReady && !!window.AFRAME.components?.arjs;
+
+      if (!aframeReady || !arjsReady) {
+        attempts += 1;
+        if (attempts > 50) {
+          console.error('[XPortl] AR.js scripts failed to load after 10s');
+          return;
+        }
+        setTimeout(tryInit, 200);
+        return;
+      }
+
+      initScene();
+    };
+
+    tryInit();
+    return () => { cancelled = true; };
+
+    function initScene() {
     initializedRef.current = true;
 
     registerXPortlComponents();
@@ -65,6 +94,13 @@ export default function ARScene({ capsules, pings, onCapsuleClick, onVortexClick
     sceneContainerRef.current.appendChild(scene);
     sceneRef.current = scene;
 
+    } // end initScene
+
+    // Local cleanup is attached via React on the outer return above
+  }, []);
+
+  // Ensure the scene DOM is torn down if the component actually unmounts.
+  useEffect(() => {
     return () => {
       if (sceneRef.current?.parentNode) {
         sceneRef.current.parentNode.removeChild(sceneRef.current);
@@ -190,7 +226,10 @@ export default function ARScene({ capsules, pings, onCapsuleClick, onVortexClick
   return <div ref={sceneContainerRef} style={{ position: 'absolute', inset: 0, zIndex: 0 }} />;
 }
 
-// ── Build a single capsule entity (unchanged logic, extracted) ──
+// ── Build a single capsule entity ──
+// The portal visual is: soft outer halo -> main sphere (emissive body) ->
+// bright pulsing core -> two crossed orbital rings. The emissive floor is
+// bumped up so the portal reads as a light source even in daylight.
 function buildCapsuleEntity(cap) {
   const locked = isCapsuleLocked(cap);
   const pal = locked ? COLORS.locked : COLORS.unlocked;
@@ -199,10 +238,17 @@ function buildCapsuleEntity(cap) {
   wrapper.setAttribute('gps-entity-place', `latitude: ${cap.lat}; longitude: ${cap.lng};`);
   wrapper.setAttribute('look-at', '[gps-camera]');
 
+  // Outer halo: low-opacity large sphere that sells the "glow" in daylight
+  const halo = document.createElement('a-sphere');
+  halo.setAttribute('radius', '3.6');
+  halo.setAttribute('color', pal.emissive);
+  halo.setAttribute('material', `opacity: 0.07; emissive: ${pal.emissive}; emissiveIntensity: 1.4; transparent: true; depthWrite: false; shader: flat`);
+  halo.setAttribute('animation__halo', 'property: scale; from: 0.92 0.92 0.92; to: 1.08 1.08 1.08; dur: 2800; easing: easeInOutSine; loop: true; dir: alternate');
+
   const sphere = document.createElement('a-sphere');
   sphere.setAttribute('radius', '1.5');
   sphere.setAttribute('color', pal.main);
-  sphere.setAttribute('material', `opacity: 0.85; emissive: ${pal.emissive}; emissiveIntensity: 0.6; transparent: true; metalness: 0.2; roughness: 0.3`);
+  sphere.setAttribute('material', `opacity: 0.9; emissive: ${pal.emissive}; emissiveIntensity: 1.3; transparent: true; metalness: 0.3; roughness: 0.25`);
   sphere.setAttribute('class', 'clickable');
   sphere.setAttribute('capsule-data', `capsuleId: ${cap.id}; locked: ${locked}`);
   sphere.setAttribute('glitch-glow', `color: ${pal.emissive}; speed: ${locked ? 3500 : 2000}; locked: ${locked}`);
@@ -210,19 +256,31 @@ function buildCapsuleEntity(cap) {
   sphere.setAttribute('animation__float', 'property: position; from: 0 0 0; to: 0 1.2 0; dur: 3000; easing: easeInOutSine; loop: true; dir: alternate');
 
   const core = document.createElement('a-sphere');
-  core.setAttribute('radius', '0.5');
+  core.setAttribute('radius', '0.55');
   core.setAttribute('color', pal.core);
-  core.setAttribute('material', `opacity: ${locked ? '0.25' : '0.5'}; emissive: ${pal.emissive}; emissiveIntensity: ${locked ? '0.8' : '1.8'}; transparent: true`);
-  core.setAttribute('animation', 'property: scale; from: 0.7 0.7 0.7; to: 1.3 1.3 1.3; dur: 1500; easing: easeInOutSine; loop: true; dir: alternate');
+  core.setAttribute('material', `opacity: ${locked ? '0.3' : '0.65'}; emissive: ${pal.emissive}; emissiveIntensity: ${locked ? '1.4' : '3.0'}; transparent: true; shader: flat`);
+  core.setAttribute('animation', 'property: scale; from: 0.7 0.7 0.7; to: 1.35 1.35 1.35; dur: 1500; easing: easeInOutSine; loop: true; dir: alternate');
   sphere.appendChild(core);
 
+  // Primary equatorial ring (thicker, brighter)
   const ring = document.createElement('a-torus');
   ring.setAttribute('radius', '2.4');
-  ring.setAttribute('radius-tubular', '0.035');
+  ring.setAttribute('radius-tubular', '0.05');
   ring.setAttribute('color', pal.ring);
-  ring.setAttribute('material', `opacity: ${locked ? '0.15' : '0.3'}; emissive: ${pal.emissive}; emissiveIntensity: 0.6; transparent: true`);
+  ring.setAttribute('material', `opacity: ${locked ? '0.25' : '0.55'}; emissive: ${pal.emissive}; emissiveIntensity: 1.1; transparent: true; shader: flat`);
   ring.setAttribute('rotation', '70 0 0');
   ring.setAttribute('animation', `property: rotation; from: 70 0 0; to: 70 360 0; dur: ${locked ? 15000 : 6000}; easing: linear; loop: true`);
+
+  // Secondary orbital ring crossing on a different axis
+  const ring2 = document.createElement('a-torus');
+  ring2.setAttribute('radius', '2.8');
+  ring2.setAttribute('radius-tubular', '0.03');
+  ring2.setAttribute('color', pal.ring);
+  ring2.setAttribute('material', `opacity: ${locked ? '0.15' : '0.35'}; emissive: ${pal.emissive}; emissiveIntensity: 0.8; transparent: true; shader: flat`);
+  ring2.setAttribute('rotation', '20 45 0');
+  ring2.setAttribute('animation', `property: rotation; from: 20 45 0; to: 20 405 0; dur: ${locked ? 18000 : 9000}; easing: linear; loop: true`);
+  wrapper.appendChild(ring2);
+  wrapper.appendChild(halo);
 
   if (locked) {
     const ring2 = document.createElement('a-torus');

@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
+import { preloadNsfwModel } from '../services/nsfwFilter';
 
 const MAX_VIDEO_SECONDS = 15;
 const MAX_IMAGE_DIMENSION = 1600;      // px on the longer side
@@ -54,6 +55,31 @@ function compressCanvasToWebp(source, facing) {
  *     ready for upload, preview is a data URL for the panel thumbnail.
  *   initialMode: 'photo'|'video' (default 'photo')
  */
+// Try getUserMedia once; on NotReadableError (device busy) wait 500ms and
+// retry once. iOS/Android sometimes hold the lock a hair longer than we'd
+// like after the previous consumer calls .stop().
+async function requestStreamWithRetry(constraints) {
+  try {
+    return await navigator.mediaDevices.getUserMedia(constraints);
+  } catch (err) {
+    if (err?.name === 'NotReadableError') {
+      await new Promise((r) => setTimeout(r, 500));
+      return navigator.mediaDevices.getUserMedia(constraints);
+    }
+    throw err;
+  }
+}
+
+function decodeGumError(err) {
+  const name = err?.name || 'Error';
+  if (name === 'NotAllowedError')     return 'Permissao de camera negada. Ajuste nas configuracoes do navegador.';
+  if (name === 'NotFoundError')       return 'Nenhuma camera encontrada neste dispositivo.';
+  if (name === 'NotReadableError')    return 'Camera em uso por outro app ou aba. Feche e tente de novo.';
+  if (name === 'OverconstrainedError') return 'Este dispositivo nao suporta a resolucao pedida.';
+  if (name === 'SecurityError')       return 'Acesso a camera bloqueado por politica de seguranca.';
+  return err?.message || 'Erro desconhecido ao abrir camera.';
+}
+
 function findArVideo() {
   return (
     document.querySelector('a-scene video') ||
@@ -92,9 +118,14 @@ function restoreArCamera(arVideo) {
     });
 }
 
+const MEDIA_RECORDER_SUPPORTED = typeof window !== 'undefined' && typeof window.MediaRecorder !== 'undefined';
+const GET_USER_MEDIA_SUPPORTED =
+  typeof navigator !== 'undefined' && !!navigator.mediaDevices?.getUserMedia;
+
 export default function CameraModal({ onClose, onCapture, initialMode = 'photo' }) {
   const videoRef = useRef(null);
   const streamRef = useRef(null);
+  const audioStreamRef = useRef(null);
   const recorderRef = useRef(null);
   const chunksRef = useRef([]);
   const recordStartRef = useRef(0);
@@ -106,6 +137,21 @@ export default function CameraModal({ onClose, onCapture, initialMode = 'photo' 
   const [elapsed, setElapsed] = useState(0);
   const [preview, setPreview] = useState(null); // { blob, type, previewUrl }
   const [error, setError] = useState(null);
+  const [loadingStream, setLoadingStream] = useState(true);
+  const [retryTick, setRetryTick] = useState(0);
+
+  // Warm up the NSFW classifier while the user is framing the shot so the
+  // confirmation step doesn't stall for 3-5 seconds on the first scan.
+  useEffect(() => { preloadNsfwModel(); }, []);
+
+  // Hard preflight: bail out with a clear message if the browser can't
+  // do anything we need, instead of a generic "erro ao abrir camera".
+  useEffect(() => {
+    if (!GET_USER_MEDIA_SUPPORTED) {
+      setError('Este navegador nao suporta acesso a camera.');
+      setLoadingStream(false);
+    }
+  }, []);
 
   // Release AR.js's camera once on mount so the modal can own the device.
   // Stored ref is restored on unmount by the cleanup effect below.
@@ -113,10 +159,16 @@ export default function CameraModal({ onClose, onCapture, initialMode = 'photo' 
     arVideoRef.current = releaseArCamera();
   }, []);
 
-  // (re)open stream when facing / mode changes
+  // (re)open stream when facing / mode / retry changes.
+  // Note: audio is NOT requested here. Recording pulls audio inside the
+  // click handler so iOS Safari sees a direct user gesture.
   useEffect(() => {
-    if (preview) return; // paused in preview state
+    if (preview) return;               // paused in preview state
+    if (!GET_USER_MEDIA_SUPPORTED) return;
+
     let cancelled = false;
+    setLoadingStream(true);
+    setError(null);
 
     (async () => {
       try {
@@ -125,20 +177,15 @@ export default function CameraModal({ onClose, onCapture, initialMode = 'photo' 
           streamRef.current = null;
         }
 
-        // Give iOS a beat to release the device handle after we stopped
+        // Give iOS / Android a beat to release the device handle after
         // whatever was holding it (AR.js or our own previous stream).
-        await new Promise((r) => setTimeout(r, 150));
+        await new Promise((r) => setTimeout(r, 300));
 
-        // Photo mode wants high res (we compress to 1600px after snap).
-        // Video mode caps at 720p to keep 15s clips under ~3 MB encoded.
         const videoConstraints = mode === 'video'
           ? { facingMode: facing, width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 24, max: 30 } }
           : { facingMode: facing, width: { ideal: 1920 }, height: { ideal: 1440 } };
 
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: videoConstraints,
-          audio: mode === 'video',
-        });
+        const stream = await requestStreamWithRetry({ video: videoConstraints, audio: false });
         if (cancelled) {
           stream.getTracks().forEach((t) => t.stop());
           return;
@@ -150,23 +197,19 @@ export default function CameraModal({ onClose, onCapture, initialMode = 'photo' 
           videoRef.current.setAttribute('playsinline', '');
           try { await videoRef.current.play(); } catch (_) { /* iOS */ }
         }
+        setLoadingStream(false);
       } catch (err) {
+        if (cancelled) return;
         console.error('[XPortl] CameraModal getUserMedia failed:', err);
-        const name = err?.name || 'Error';
-        const msg =
-          name === 'NotAllowedError' ? 'Permissao de camera negada.' :
-          name === 'NotFoundError'   ? 'Nenhuma camera encontrada.' :
-          name === 'NotReadableError' ? 'Camera em uso por outro app/aba. Feche e tente de novo.' :
-          name === 'OverconstrainedError' ? 'Este dispositivo nao suporta a resolucao pedida.' :
-          (err?.message || 'Erro ao abrir camera.');
-        setError(msg);
+        setError(decodeGumError(err));
+        setLoadingStream(false);
       }
     })();
 
     return () => {
       cancelled = true;
     };
-  }, [facing, mode, preview]);
+  }, [facing, mode, preview, retryTick]);
 
   // cleanup on unmount
   useEffect(() => {
@@ -174,6 +217,10 @@ export default function CameraModal({ onClose, onCapture, initialMode = 'photo' 
       if (streamRef.current) {
         streamRef.current.getTracks().forEach((t) => t.stop());
         streamRef.current = null;
+      }
+      if (audioStreamRef.current) {
+        audioStreamRef.current.getTracks().forEach((t) => t.stop());
+        audioStreamRef.current = null;
       }
       if (preview?.previewUrl && preview.type === 'video') {
         URL.revokeObjectURL(preview.previewUrl);
@@ -183,7 +230,7 @@ export default function CameraModal({ onClose, onCapture, initialMode = 'photo' 
       const arVideo = arVideoRef.current;
       arVideoRef.current = null;
       if (arVideo) {
-        setTimeout(() => restoreArCamera(arVideo), 200);
+        setTimeout(() => restoreArCamera(arVideo), 300);
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -222,11 +269,31 @@ export default function CameraModal({ onClose, onCapture, initialMode = 'photo' 
     }
   }, [facing]);
 
-  const startVideo = useCallback(() => {
+  const startVideo = useCallback(async () => {
     if (!streamRef.current) return;
+    if (!MEDIA_RECORDER_SUPPORTED) {
+      setError('Este navegador nao suporta gravacao de video.');
+      return;
+    }
     chunksRef.current = [];
+
+    // Pull the mic INSIDE the user-gesture callback so iOS Safari grants
+    // permission. Combine with the existing video track into a fresh
+    // MediaStream that the recorder can consume.
+    let recStream = streamRef.current;
     try {
-      const recorder = new MediaRecorder(streamRef.current, {
+      const audioStream = await requestStreamWithRetry({ audio: true, video: false });
+      audioStreamRef.current = audioStream;
+      recStream = new MediaStream([
+        ...streamRef.current.getVideoTracks(),
+        ...audioStream.getAudioTracks(),
+      ]);
+    } catch (audErr) {
+      console.warn('[XPortl] Audio track unavailable, recording video-only:', audErr);
+    }
+
+    try {
+      const recorder = new MediaRecorder(recStream, {
         mimeType: MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus')
           ? 'video/webm;codecs=vp9,opus'
           : MediaRecorder.isTypeSupported('video/webm;codecs=vp8,opus')
@@ -240,6 +307,11 @@ export default function CameraModal({ onClose, onCapture, initialMode = 'photo' 
       };
       recorder.onstop = async () => {
         const blob = new Blob(chunksRef.current, { type: 'video/webm' });
+        // Release mic as soon as recording ends
+        if (audioStreamRef.current) {
+          audioStreamRef.current.getTracks().forEach((t) => t.stop());
+          audioStreamRef.current = null;
+        }
         if (blob.size > MAX_UPLOAD_BYTES) {
           setError(`Video muito grande (${(blob.size / 1024 / 1024).toFixed(1)} MB). Limite: 5 MB.`);
           chunksRef.current = [];
@@ -295,12 +367,27 @@ export default function CameraModal({ onClose, onCapture, initialMode = 'photo' 
     onCapture(preview);
   }, [preview, onCapture]);
 
+  const shutterDisabled = !preview && (loadingStream || !!error || !streamRef.current);
+
   return (
     <div style={s.backdrop}>
       {error && (
-        <div style={s.errorBar}>
-          <span>{error}</span>
-          <button style={s.errorClose} onClick={onClose}>×</button>
+        <div style={s.errorPanel}>
+          <div style={s.errorTitle}>camera indisponivel</div>
+          <div style={s.errorMsg}>{error}</div>
+          <div style={s.errorBtnRow}>
+            <button style={s.btnGhost} onClick={onClose}>voltar</button>
+            <button style={s.btnPrimary} onClick={() => { setError(null); setRetryTick((n) => n + 1); }}>
+              tentar de novo
+            </button>
+          </div>
+        </div>
+      )}
+
+      {loadingStream && !error && !preview && (
+        <div style={s.loadingOverlay}>
+          <div style={s.loadingSpinner} />
+          <div style={s.loadingText}>abrindo camera...</div>
         </div>
       )}
 
@@ -346,7 +433,9 @@ export default function CameraModal({ onClose, onCapture, initialMode = 'photo' 
                 style={{
                   ...s.shutter,
                   ...(mode === 'video' && recording ? s.shutterRecording : {}),
+                  ...(shutterDisabled ? { opacity: 0.35, pointerEvents: 'none' } : {}),
                 }}
+                disabled={shutterDisabled}
                 onClick={mode === 'photo' ? snapPhoto : (recording ? stopVideo : startVideo)}
                 aria-label={mode === 'photo' ? 'Capturar' : (recording ? 'Parar' : 'Gravar')}
               >
@@ -433,15 +522,32 @@ const s = {
     width: 8, height: 8, borderRadius: '50%', background: '#ff3366',
     boxShadow: '0 0 10px #ff3366', animation: 'pulse-ring 1s ease infinite',
   },
-  errorBar: {
-    position: 'absolute', top: 0, left: 0, right: 0, zIndex: 4,
-    padding: '14px 18px', background: '#1a0a14', color: '#ff6688',
-    borderBottom: '1px solid #ff3366', display: 'flex', justifyContent: 'space-between',
-    alignItems: 'center', fontSize: '0.75rem',
+  errorPanel: {
+    position: 'absolute', inset: 0, zIndex: 5, background: 'rgba(0,0,0,0.88)',
+    display: 'flex', flexDirection: 'column', justifyContent: 'center',
+    alignItems: 'center', padding: 32, textAlign: 'center', gap: 16,
   },
-  errorClose: {
-    background: 'none', border: 'none', color: '#ff6688', fontSize: '1.2rem',
-    cursor: 'pointer', padding: 4,
+  errorTitle: {
+    fontSize: '0.7rem', letterSpacing: '0.25em', textTransform: 'uppercase',
+    color: '#ff6688', fontWeight: 700,
+  },
+  errorMsg: {
+    fontSize: '0.85rem', color: '#e8e8f0', lineHeight: 1.6, maxWidth: 340,
+  },
+  errorBtnRow: { display: 'flex', gap: 10, marginTop: 8 },
+  loadingOverlay: {
+    position: 'absolute', inset: 0, zIndex: 4, display: 'flex',
+    flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+    gap: 14, background: 'rgba(0,0,0,0.5)', pointerEvents: 'none',
+  },
+  loadingSpinner: {
+    width: 32, height: 32, borderRadius: '50%',
+    border: '2px solid rgba(255,255,255,0.2)', borderTopColor: '#00f0ff',
+    animation: 'spin 0.9s linear infinite',
+  },
+  loadingText: {
+    fontSize: '0.7rem', letterSpacing: '0.2em', textTransform: 'uppercase',
+    color: 'rgba(255,255,255,0.65)',
   },
   bottomBar: {
     position: 'relative', zIndex: 2, padding: '18px 24px 34px',
