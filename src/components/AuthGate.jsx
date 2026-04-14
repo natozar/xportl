@@ -19,7 +19,7 @@ export default function AuthGate() {
           <span style={s.logoText}>X</span>
         </div>
         <h1 style={s.title}>XPORTL</h1>
-        <p style={s.tagline}>Capsulas do tempo em AR</p>
+        <p style={s.tagline}>Deixe rastros. Encontre portais.</p>
         <p style={s.subtitle}>Entre para plantar e descobrir portais digitais no mundo real.</p>
 
         <div style={s.buttons}>

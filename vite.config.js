@@ -10,7 +10,7 @@ export default defineConfig({
       includeAssets: ['favicon.svg', 'icons/*.png'],
       manifest: {
         id: '/',
-        name: 'XPortl - Capsulas do Tempo em AR',
+        name: 'XPortl - Deixe rastros. Encontre portais.',
         short_name: 'XPortl',
         description: 'A Realidade Aumentada de Capsulas do Tempo. Descubra portais digitais escondidos no mundo real.',
         theme_color: '#0d0a1a',

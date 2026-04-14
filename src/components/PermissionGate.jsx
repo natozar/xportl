@@ -83,7 +83,7 @@ export default function PermissionGate({ geo, cam, onComplete }) {
           <span className="neon-green" style={{ fontSize: '3rem', fontWeight: 700 }}>X</span>
         </div>
         <h1 style={styles.title}>XPORTL</h1>
-        <p style={styles.tagline}>Capsulas do tempo em AR</p>
+        <p style={styles.tagline}>Deixe rastros. Encontre portais.</p>
         <p style={styles.subtitle}>
           Abra portais digitais escondidos<br />no mundo ao seu redor.
         </p>
