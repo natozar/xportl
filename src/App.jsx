@@ -292,8 +292,10 @@ export default function App() {
   }, [ready, geo.lat, geo.lng]);
 
   // ── Leave Trace (with all compliance checks) ──
-  const handleLeaveTrace = useCallback(async ({ unlockDate, mediaBlob, mediaType, viewsLeft, visibilityLayer }) => {
+  const handleLeaveTrace = useCallback(async ({ unlockDate, message, mediaBlob, mediaType, viewsLeft, visibilityLayer }) => {
     if (saving || geo.lat === null || !session?.user?.id) return;
+
+    const body = (message && message.trim()) || 'Estive aqui!';
 
     // Rate limit check
     const rateCheck = await checkRateLimit(session.user.id, 'create_capsule');
@@ -310,7 +312,7 @@ export default function App() {
     }
 
     // Content validation
-    const contentCheck = validateContent('Estive aqui!');
+    const contentCheck = validateContent(body);
     if (!contentCheck.allowed) {
       alert(contentCheck.reason);
       return;
@@ -334,7 +336,7 @@ export default function App() {
         lat: plant.lat,
         lng: plant.lng,
         altitude: geo.altitude,
-        content: { type: 'text', body: 'Estive aqui!' },
+        content: { type: 'text', body },
         visibility_layer: visibilityLayer || 'public',
         unlock_date: unlockDate,
         media_url: mediaUrl,

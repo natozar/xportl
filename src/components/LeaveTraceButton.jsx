@@ -11,11 +11,15 @@ const TYPES = {
   private:  { key: 'private',  label: 'Privada',  desc: 'So visivel por link direto', color: '#00e5ff', rgb: '0,229,255', layer: 'private', viewsLeft: null },
 };
 
+const DEFAULT_MESSAGE = 'Estive aqui!';
+const MAX_MESSAGE = 280;
+
 export default function LeaveTraceButton({ onPress, saving }) {
   const [panelOpen, setPanelOpen] = useState(false);
   const [feedback, setFeedback] = useState(null);
   const [capsuleType, setCapsuleType] = useState('perpetual');
   const [ghostViews, setGhostViews] = useState(10);
+  const [message, setMessage] = useState(DEFAULT_MESSAGE);
   const { media, recording, scanning, moderationError, capturePhoto, startAudioRecording, stopAudioRecording, clearMedia, dismissModerationError } = useMediaCapture();
 
   const currentType = TYPES[capsuleType];
@@ -34,8 +38,11 @@ export default function LeaveTraceButton({ onPress, saving }) {
       unlockDate = tomorrow.toISOString();
     }
 
+    const trimmed = (message || '').trim() || DEFAULT_MESSAGE;
+
     await onPress({
       unlockDate,
+      message: trimmed,
       mediaBlob: media?.blob || null,
       mediaType: media?.type || null,
       viewsLeft: capsuleType === 'ghost' ? ghostViews : null,
@@ -45,6 +52,7 @@ export default function LeaveTraceButton({ onPress, saving }) {
     clearMedia();
     setCapsuleType('perpetual');
     setGhostViews(10);
+    setMessage(DEFAULT_MESSAGE);
     setFeedback('done');
     if (navigator.vibrate) navigator.vibrate([50, 30, 50]);
     setTimeout(() => setFeedback(null), 2500);
@@ -54,6 +62,7 @@ export default function LeaveTraceButton({ onPress, saving }) {
     setPanelOpen(false);
     clearMedia();
     setCapsuleType('perpetual');
+    setMessage(DEFAULT_MESSAGE);
   };
 
   return (
@@ -182,16 +191,34 @@ export default function LeaveTraceButton({ onPress, saving }) {
               </div>
             )}
 
+            {/* ── Message ── */}
+            <div style={st.sectionLabel}>MENSAGEM</div>
+            <textarea
+              style={st.messageInput}
+              value={message}
+              onChange={(e) => setMessage(e.target.value.slice(0, MAX_MESSAGE))}
+              placeholder="Deixe um rastro..."
+              rows={2}
+            />
+            <div style={st.charCount}>{message.length}/{MAX_MESSAGE}</div>
+
             {/* ── Media attachments ── */}
-            <div style={st.sectionLabel}>ANEXAR MIDIA</div>
+            <div style={st.sectionLabel}>ANEXAR MIDIA (OPCIONAL)</div>
             <div style={st.mediaRow}>
-              <button style={{ ...st.mediaBtn, ...(scanning ? { opacity: 0.4, pointerEvents: 'none' } : {}) }} onClick={capturePhoto}>
+              <button style={{ ...st.mediaBtn, ...(scanning ? { opacity: 0.4, pointerEvents: 'none' } : {}) }} onClick={() => capturePhoto('environment')}>
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
                   <rect x="2" y="6" width="20" height="14" rx="3" stroke="currentColor" strokeWidth="1.5" />
                   <circle cx="12" cy="13" r="4" stroke="currentColor" strokeWidth="1.5" />
                   <circle cx="12" cy="13" r="1.5" fill="currentColor" opacity="0.4" />
                 </svg>
                 <span>Foto</span>
+              </button>
+              <button style={{ ...st.mediaBtn, ...(scanning ? { opacity: 0.4, pointerEvents: 'none' } : {}) }} onClick={() => capturePhoto('user')}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                  <circle cx="12" cy="8" r="4" stroke="currentColor" strokeWidth="1.5" />
+                  <path d="M4 20c1.5-3.5 5-5 8-5s6.5 1.5 8 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                </svg>
+                <span>Selfie</span>
               </button>
               {recording ? (
                 <button style={{ ...st.mediaBtn, ...st.mediaBtnActive }} onClick={stopAudioRecording}>
@@ -309,6 +336,17 @@ const st = {
   sectionLabel: {
     fontSize: '0.5rem', fontWeight: 700, letterSpacing: '0.2em',
     color: 'rgba(255,255,255,0.2)', marginBottom: 8,
+  },
+  messageInput: {
+    width: '100%', boxSizing: 'border-box', padding: '10px 12px',
+    background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)',
+    borderRadius: 10, color: 'var(--text-primary, #e8e8f0)', fontFamily: 'inherit',
+    fontSize: '0.8rem', lineHeight: 1.5, resize: 'vertical', minHeight: 48,
+    outline: 'none',
+  },
+  charCount: {
+    fontSize: '0.55rem', color: 'rgba(255,255,255,0.25)', textAlign: 'right',
+    marginTop: 4, marginBottom: 14, letterSpacing: '0.08em',
   },
 
   // ── Type selector ──

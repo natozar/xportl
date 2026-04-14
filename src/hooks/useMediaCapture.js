@@ -14,45 +14,56 @@ export function useMediaCapture() {
   const chunksRef = useRef([]);
 
   // ── Capture photo + NSFW scan ──
-  // Preferred path: grab the frame straight off AR.js's own <video> element.
-  // Avoids a second getUserMedia that would collide with AR.js on iOS Safari
-  // and on Androids that throw NotReadableError for a second consumer.
-  // Fallback path: if AR.js never mounted its video (aframe-ar failed to
-  // load, user is not in AR mode, etc.) we open a one-shot getUserMedia,
-  // draw one frame, and close it.
-  const capturePhoto = useCallback(async () => {
+  // facing: 'environment' (default) | 'user'
+  // - 'environment': read from AR.js's live video element when available,
+  //   fall back to a fresh getUserMedia if AR didn't mount.
+  // - 'user': always open a fresh getUserMedia with the front camera.
+  //   Front vs back are distinct deviceIds, so this does NOT conflict
+  //   with AR.js holding the back camera on iOS/Android.
+  const capturePhoto = useCallback(async (facing = 'environment') => {
     setModerationError(null);
 
     try {
       const canvas = document.createElement('canvas');
 
       const arVideo =
-        document.querySelector('a-scene video') ||
-        document.querySelector('#arjs-video') ||
-        document.querySelector('video[autoplay][playsinline]');
+        facing === 'environment' &&
+        (document.querySelector('a-scene video') ||
+          document.querySelector('#arjs-video') ||
+          document.querySelector('video[autoplay][playsinline]'));
 
       if (arVideo && arVideo.videoWidth) {
         canvas.width = arVideo.videoWidth;
         canvas.height = arVideo.videoHeight;
         canvas.getContext('2d').drawImage(arVideo, 0, 0);
       } else {
-        // Fallback: spin up our own stream since AR.js didn't
         const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 960 } },
+          video: {
+            facingMode: facing === 'user' ? 'user' : 'environment',
+            width: { ideal: 1920 },
+            height: { ideal: 1440 },
+          },
         });
         const video = document.createElement('video');
         video.srcObject = stream;
         video.setAttribute('playsinline', '');
         video.muted = true;
-        try { await video.play(); } catch (_) { /* iOS may need a second */ }
-        await new Promise((r) => setTimeout(r, 300));
-        canvas.width = video.videoWidth || 1280;
-        canvas.height = video.videoHeight || 960;
-        canvas.getContext('2d').drawImage(video, 0, 0);
+        try { await video.play(); } catch (_) { /* iOS may need a moment */ }
+        await new Promise((r) => setTimeout(r, 350));
+        canvas.width = video.videoWidth || 1920;
+        canvas.height = video.videoHeight || 1440;
+        const ctx = canvas.getContext('2d');
+        // Mirror front-camera captures so the stored image matches the
+        // live preview the user just took.
+        if (facing === 'user') {
+          ctx.translate(canvas.width, 0);
+          ctx.scale(-1, 1);
+        }
+        ctx.drawImage(video, 0, 0);
         stream.getTracks().forEach((t) => t.stop());
       }
 
-      const preview = canvas.toDataURL('image/webp', 0.5);
+      const preview = canvas.toDataURL('image/webp', 0.92);
 
       // ── NSFW scan BEFORE making photo available ──
       setScanning(true);
@@ -65,7 +76,7 @@ export function useMediaCapture() {
         return null;
       }
 
-      const blob = await new Promise((r) => canvas.toBlob(r, 'image/webp', 0.85));
+      const blob = await new Promise((r) => canvas.toBlob(r, 'image/webp', 0.92));
       setMedia({ blob, type: 'image', preview });
       return { blob, type: 'image', preview };
     } catch (err) {
