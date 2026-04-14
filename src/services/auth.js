@@ -2,14 +2,11 @@ import { supabase } from './supabase';
 
 const TOS_VERSION = '1.0.0';
 
-/**
- * Dynamic redirect URL — always uses the current domain.
- * Works on localhost, ngrok, vercel, custom domain — zero hardcode.
- */
+// Always redirect OAuth / email flows back to /app — the React app lives
+// there after the LP split, and the LP has an inline safety-net that bounces
+// stray #access_token hashes to /app anyway.
 function getRedirectUrl() {
-  const url = window.location.origin;
-  console.log('[XPortl Auth] Redirect URL:', url);
-  return url;
+  return window.location.origin + '/app';
 }
 
 // ── OAuth ──

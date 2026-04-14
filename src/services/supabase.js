@@ -11,7 +11,20 @@ if (!supabaseUrl || !supabaseAnonKey) {
   );
 }
 
+// Explicit auth config so the session survives page reloads, PWA relaunches,
+// and autoUpdate SW swaps. iOS Safari still wipes localStorage after 7d of
+// non-use (ITP); the only real fix for that is HTTP-only cookies via a custom
+// backend, which we're not doing here.
 export const supabase = createClient(
   supabaseUrl || '',
-  supabaseAnonKey || ''
+  supabaseAnonKey || '',
+  {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true,
+      storage: typeof window !== 'undefined' ? window.localStorage : undefined,
+      flowType: 'pkce',
+    },
+  }
 );
