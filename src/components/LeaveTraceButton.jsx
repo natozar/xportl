@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useMediaCapture } from '../hooks/useMediaCapture';
 import { preloadNsfwModel } from '../services/nsfwFilter';
+import CameraModal from './CameraModal';
 
 const GHOST_VIEW_OPTIONS = [5, 10, 50];
 
@@ -20,7 +21,8 @@ export default function LeaveTraceButton({ onPress, saving }) {
   const [capsuleType, setCapsuleType] = useState('perpetual');
   const [ghostViews, setGhostViews] = useState(10);
   const [message, setMessage] = useState(DEFAULT_MESSAGE);
-  const { media, recording, scanning, moderationError, capturePhoto, startAudioRecording, stopAudioRecording, clearMedia, dismissModerationError } = useMediaCapture();
+  const [cameraOpen, setCameraOpen] = useState(null); // null | 'photo' | 'video'
+  const { media, recording, scanning, moderationError, acceptCapturedMedia, startAudioRecording, stopAudioRecording, clearMedia, dismissModerationError } = useMediaCapture();
 
   const currentType = TYPES[capsuleType];
 
@@ -205,20 +207,13 @@ export default function LeaveTraceButton({ onPress, saving }) {
             {/* ── Media attachments ── */}
             <div style={st.sectionLabel}>ANEXAR MIDIA (OPCIONAL)</div>
             <div style={st.mediaRow}>
-              <button style={{ ...st.mediaBtn, ...(scanning ? { opacity: 0.4, pointerEvents: 'none' } : {}) }} onClick={() => capturePhoto('environment')}>
+              <button style={{ ...st.mediaBtn, ...(scanning ? { opacity: 0.4, pointerEvents: 'none' } : {}) }} onClick={() => setCameraOpen('photo')}>
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
                   <rect x="2" y="6" width="20" height="14" rx="3" stroke="currentColor" strokeWidth="1.5" />
                   <circle cx="12" cy="13" r="4" stroke="currentColor" strokeWidth="1.5" />
                   <circle cx="12" cy="13" r="1.5" fill="currentColor" opacity="0.4" />
                 </svg>
-                <span>Foto</span>
-              </button>
-              <button style={{ ...st.mediaBtn, ...(scanning ? { opacity: 0.4, pointerEvents: 'none' } : {}) }} onClick={() => capturePhoto('user')}>
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                  <circle cx="12" cy="8" r="4" stroke="currentColor" strokeWidth="1.5" />
-                  <path d="M4 20c1.5-3.5 5-5 8-5s6.5 1.5 8 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                </svg>
-                <span>Selfie</span>
+                <span>Camera</span>
               </button>
               {recording ? (
                 <button style={{ ...st.mediaBtn, ...st.mediaBtnActive }} onClick={stopAudioRecording}>
@@ -240,9 +235,13 @@ export default function LeaveTraceButton({ onPress, saving }) {
             {/* Media preview */}
             {media && (
               <div style={st.preview}>
-                {media.type === 'image' ? (
+                {media.type === 'image' && (
                   <img src={media.preview} alt="Preview" style={st.previewImg} />
-                ) : (
+                )}
+                {media.type === 'video' && (
+                  <video src={media.preview} style={st.previewImg} muted playsInline autoPlay loop />
+                )}
+                {media.type === 'audio' && (
                   <div style={st.audioPreview}>
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
                       <polygon points="8,5 19,12 8,19" fill="#00ff88" opacity="0.6" />
@@ -277,6 +276,18 @@ export default function LeaveTraceButton({ onPress, saving }) {
             <button style={st.cancelBtn} onClick={handleClose}>Cancelar</button>
           </div>
         </div>
+      )}
+
+      {/* Camera modal */}
+      {cameraOpen && (
+        <CameraModal
+          initialMode={cameraOpen}
+          onClose={() => setCameraOpen(null)}
+          onCapture={async (captured) => {
+            setCameraOpen(null);
+            await acceptCapturedMedia(captured);
+          }}
+        />
       )}
 
       {/* FAB */}

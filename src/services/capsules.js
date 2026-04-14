@@ -6,7 +6,11 @@ import { deleteMedia } from './storage';
 // Works for anything the capture hook produces (webm audio, webp images).
 function inferMediaType(url) {
   if (!url) return null;
-  if (/\.(webm|mp3|ogg|wav|m4a|aac)(\?|$)/i.test(url)) return 'audio';
+  // Video path is checked first because 'webm' can be both audio and video;
+  // storage.js puts video under /video/ so the path discriminates.
+  if (/\/video\//i.test(url) || /\.(mp4|mov|webm\?type=video)(\?|$)/i.test(url)) return 'video';
+  if (/\/audio\//i.test(url) || /\.(mp3|ogg|wav|m4a|aac)(\?|$)/i.test(url)) return 'audio';
+  if (/\.(webm)(\?|$)/i.test(url)) return 'audio'; // legacy audio blobs
   if (/\.(webp|jpg|jpeg|png|gif|avif)(\?|$)/i.test(url)) return 'image';
   return null;
 }

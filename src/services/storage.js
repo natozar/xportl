@@ -2,20 +2,27 @@ import { supabase } from './supabase';
 
 const BUCKET = 'capsule-media';
 
+const EXT_BY_TYPE = { image: 'webp', audio: 'webm', video: 'webm' };
+const DEFAULT_CONTENT_TYPE = {
+  image: 'image/webp',
+  audio: 'audio/webm',
+  video: 'video/webm',
+};
+
 /**
- * Upload a file (photo or audio) to Supabase Storage
+ * Upload a file (photo, audio, or video) to Supabase Storage
  * @param {File|Blob} file
- * @param {'image'|'audio'} mediaType
+ * @param {'image'|'audio'|'video'} mediaType
  * @returns {{ url: string, path: string }}
  */
 export async function uploadMedia(file, mediaType) {
-  const ext = mediaType === 'image' ? 'webp' : 'webm';
+  const ext = EXT_BY_TYPE[mediaType] || 'bin';
   const path = `${mediaType}/${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`;
 
   const { error } = await supabase.storage
     .from(BUCKET)
     .upload(path, file, {
-      contentType: file.type || (mediaType === 'image' ? 'image/webp' : 'audio/webm'),
+      contentType: file.type || DEFAULT_CONTENT_TYPE[mediaType] || 'application/octet-stream',
       cacheControl: '3600',
     });
 

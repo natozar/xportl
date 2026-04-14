@@ -155,6 +155,19 @@ export default function CapsuleModal({ capsule, onClose, onSelfDestruct, onRepor
                 </div>
               )}
 
+              {/* Media: Video */}
+              {capsule.media_type === 'video' && capsule.media_url && (
+                <div style={st.mediaContainer}>
+                  <video
+                    src={capsule.media_url}
+                    style={st.mediaImg}
+                    controls
+                    playsInline
+                    preload="metadata"
+                  />
+                </div>
+              )}
+
               {/* Media: Audio */}
               {capsule.media_type === 'audio' && capsule.media_url && (
                 <div style={st.audioPlayer}>

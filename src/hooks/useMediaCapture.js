@@ -123,6 +123,39 @@ export function useMediaCapture() {
     }
   }, []);
 
+  // Ingest a capture coming from CameraModal: runs NSFW scan on images and
+  // on the first frame of videos, sets `media` if allowed, otherwise
+  // surfaces moderationError and keeps the old media slot empty.
+  const acceptCapturedMedia = useCallback(async ({ blob, type, previewUrl }) => {
+    setModerationError(null);
+
+    let scanSourceDataUrl = null;
+
+    if (type === 'image') {
+      scanSourceDataUrl = previewUrl; // already a data URL
+    } else if (type === 'video') {
+      try {
+        scanSourceDataUrl = await extractFirstFrame(blob);
+      } catch (err) {
+        console.warn('[XPortl] Could not extract video frame for scan:', err);
+      }
+    }
+
+    if (scanSourceDataUrl) {
+      setScanning(true);
+      const result = await classifyImage(scanSourceDataUrl);
+      setScanning(false);
+      if (result.blocked) {
+        setModerationError(result.reason);
+        console.warn('[XPortl] NSFW blocked:', result.scores);
+        return false;
+      }
+    }
+
+    setMedia({ blob, type, preview: previewUrl });
+    return true;
+  }, []);
+
   const stopAudioRecording = useCallback(() => {
     if (recorderRef.current?.state === 'recording') {
       recorderRef.current.stop();
@@ -148,9 +181,48 @@ export function useMediaCapture() {
     scanning,
     moderationError,
     capturePhoto,
+    acceptCapturedMedia,
     startAudioRecording,
     stopAudioRecording,
     clearMedia,
     dismissModerationError,
   };
+}
+
+// Extract the first decodable frame of a video blob as a webp data URL.
+// Used to feed the NSFW classifier a single representative image.
+function extractFirstFrame(blob) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(blob);
+    const video = document.createElement('video');
+    video.muted = true;
+    video.playsInline = true;
+    video.src = url;
+
+    const cleanup = () => URL.revokeObjectURL(url);
+
+    video.onloadeddata = () => {
+      try {
+        video.currentTime = Math.min(0.1, (video.duration || 1) / 2);
+      } catch (_) { /* ignore */ }
+    };
+    video.onseeked = () => {
+      try {
+        const canvas = document.createElement('canvas');
+        canvas.width = video.videoWidth || 640;
+        canvas.height = video.videoHeight || 480;
+        canvas.getContext('2d').drawImage(video, 0, 0);
+        const dataUrl = canvas.toDataURL('image/webp', 0.7);
+        cleanup();
+        resolve(dataUrl);
+      } catch (err) {
+        cleanup();
+        reject(err);
+      }
+    };
+    video.onerror = (err) => { cleanup(); reject(err); };
+
+    // Some browsers don't fire onloadeddata unless play() is called
+    video.play().catch(() => {});
+  });
 }
