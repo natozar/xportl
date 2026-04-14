@@ -144,6 +144,20 @@ export default function CameraModal({ onClose, onCapture, initialMode = 'photo' 
   // confirmation step doesn't stall for 3-5 seconds on the first scan.
   useEffect(() => { preloadNsfwModel(); }, []);
 
+  // ESC closes the modal when nothing is mid-recording
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key === 'Escape' && !recording) onClose();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose, recording]);
+
+  // If video recording isn't supported, force photo mode and keep it there
+  useEffect(() => {
+    if (!MEDIA_RECORDER_SUPPORTED && mode === 'video') setMode('photo');
+  }, [mode]);
+
   // Hard preflight: bail out with a clear message if the browser can't
   // do anything we need, instead of a generic "erro ao abrir camera".
   useEffect(() => {
@@ -257,6 +271,7 @@ export default function CameraModal({ onClose, onCapture, initialMode = 'photo' 
     try {
       const { previewUrl, blob } = await compressCanvasToWebp(raw, facing);
       setPreview({ blob, type: 'image', previewUrl });
+      if (navigator.vibrate) navigator.vibrate(20);
     } catch (err) {
       setError(err.message || 'Erro ao processar foto');
       return;
@@ -312,6 +327,12 @@ export default function CameraModal({ onClose, onCapture, initialMode = 'photo' 
           audioStreamRef.current.getTracks().forEach((t) => t.stop());
           audioStreamRef.current = null;
         }
+        if (blob.size === 0) {
+          setError('Gravacao vazia. Tente novamente.');
+          chunksRef.current = [];
+          setPreview(null);
+          return;
+        }
         if (blob.size > MAX_UPLOAD_BYTES) {
           setError(`Video muito grande (${(blob.size / 1024 / 1024).toFixed(1)} MB). Limite: 5 MB.`);
           chunksRef.current = [];
@@ -320,6 +341,7 @@ export default function CameraModal({ onClose, onCapture, initialMode = 'photo' 
         }
         const previewUrl = URL.createObjectURL(blob);
         setPreview({ blob, type: 'video', previewUrl });
+        if (navigator.vibrate) navigator.vibrate([20, 40, 20]);
         if (streamRef.current) {
           streamRef.current.getTracks().forEach((t) => t.stop());
           streamRef.current = null;
@@ -418,13 +440,15 @@ export default function CameraModal({ onClose, onCapture, initialMode = 'photo' 
               >
                 foto
               </button>
-              <button
-                style={{ ...s.modeBtn, ...(mode === 'video' ? s.modeBtnActive : {}) }}
-                onClick={() => !recording && setMode('video')}
-                disabled={recording}
-              >
-                video 15s
-              </button>
+              {MEDIA_RECORDER_SUPPORTED && (
+                <button
+                  style={{ ...s.modeBtn, ...(mode === 'video' ? s.modeBtnActive : {}) }}
+                  onClick={() => !recording && setMode('video')}
+                  disabled={recording}
+                >
+                  video 15s
+                </button>
+              )}
             </div>
 
             <div style={s.actionRow}>
@@ -475,6 +499,7 @@ export default function CameraModal({ onClose, onCapture, initialMode = 'photo' 
               style={s.previewMedia}
               controls
               autoPlay
+              muted
               loop
               playsInline
             />
@@ -507,15 +532,18 @@ const s = {
     objectFit: 'contain', background: '#000',
   },
   closeBtn: {
-    position: 'absolute', top: 14, right: 14, width: 40, height: 40,
+    position: 'absolute', top: 'calc(14px + env(safe-area-inset-top, 0px))', right: 14,
+    width: 44, height: 44,
     borderRadius: '50%', background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(10px)',
+    WebkitBackdropFilter: 'blur(10px)',
     color: '#fff', border: '1px solid rgba(255,255,255,0.2)', fontSize: '1.5rem',
-    cursor: 'pointer', zIndex: 3, display: 'flex', alignItems: 'center', justifyContent: 'center',
-    lineHeight: 1,
+    cursor: 'pointer', zIndex: 6, display: 'flex', alignItems: 'center', justifyContent: 'center',
+    lineHeight: 1, padding: 0,
   },
   recBadge: {
-    position: 'absolute', top: 18, left: '50%', transform: 'translateX(-50%)',
-    zIndex: 3, display: 'flex', alignItems: 'center', gap: 8,
+    position: 'absolute', top: 'calc(18px + env(safe-area-inset-top, 0px))',
+    left: '50%', transform: 'translateX(-50%)',
+    zIndex: 6, display: 'flex', alignItems: 'center', gap: 8,
     padding: '6px 14px', background: 'rgba(255,51,102,0.2)',
     border: '1px solid #ff3366', borderRadius: 999,
     color: '#ff6688', fontSize: '0.72rem', fontWeight: 600, fontFamily: 'ui-monospace, monospace',
@@ -525,7 +553,7 @@ const s = {
     boxShadow: '0 0 10px #ff3366', animation: 'pulse-ring 1s ease infinite',
   },
   errorPanel: {
-    position: 'absolute', inset: 0, zIndex: 5, background: 'rgba(0,0,0,0.88)',
+    position: 'absolute', inset: 0, zIndex: 10, background: 'rgba(0,0,0,0.88)',
     display: 'flex', flexDirection: 'column', justifyContent: 'center',
     alignItems: 'center', padding: 32, textAlign: 'center', gap: 16,
   },
@@ -538,7 +566,7 @@ const s = {
   },
   errorBtnRow: { display: 'flex', gap: 10, marginTop: 8 },
   loadingOverlay: {
-    position: 'absolute', inset: 0, zIndex: 4, display: 'flex',
+    position: 'absolute', inset: 0, zIndex: 8, display: 'flex',
     flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
     gap: 14, background: 'rgba(0,0,0,0.5)', pointerEvents: 'none',
   },
@@ -552,7 +580,7 @@ const s = {
     color: 'rgba(255,255,255,0.65)',
   },
   bottomBar: {
-    position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 2,
+    position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 5,
     padding: '18px 24px calc(34px + env(safe-area-inset-bottom, 0px))',
     background: 'linear-gradient(to top, rgba(0,0,0,0.85), transparent)',
     display: 'flex', flexDirection: 'column', gap: 16,

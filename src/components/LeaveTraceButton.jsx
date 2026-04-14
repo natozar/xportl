@@ -334,7 +334,7 @@ const st = {
     width: '100%', maxWidth: 420, maxHeight: '85vh', overflowY: 'auto',
     background: 'rgba(14,14,20,0.92)', backdropFilter: 'blur(30px)', WebkitBackdropFilter: 'blur(30px)',
     borderTop: '1px solid rgba(255,255,255,0.06)', borderRadius: '20px 20px 0 0',
-    padding: '12px 20px 32px',
+    padding: '12px 20px calc(32px + env(safe-area-inset-bottom, 0px))',
   },
   handle: {
     width: 36, height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.12)',
