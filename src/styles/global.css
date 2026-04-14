@@ -158,6 +158,22 @@ a-scene .a-orientation-modal {
   to { opacity: 1; transform: translateY(0); }
 }
 
+/* ── Leaflet popup override ── */
+.xportl-popup .leaflet-popup-content-wrapper {
+  background: transparent !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+  padding: 0 !important;
+}
+.xportl-popup .leaflet-popup-content {
+  margin: 0 !important;
+}
+.xportl-popup .leaflet-popup-tip {
+  background: #13102a !important;
+  border: 1px solid rgba(0,240,255,0.15) !important;
+  box-shadow: none !important;
+}
+
 /* ── Buttons — clean, no default browser chrome ── */
 button {
   font-family: inherit;

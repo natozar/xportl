@@ -13,6 +13,18 @@ const TABS = [
     ),
   },
   {
+    id: 'map',
+    label: 'Mapa',
+    icon: (active) => (
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+        <path d="M3 7l6-3 6 3 6-3v14l-6 3-6-3-6 3V7z" stroke={active ? '#00f0ff' : 'currentColor'} strokeWidth="1.5"
+          fill={active ? 'rgba(0,240,255,0.08)' : 'none'} />
+        <line x1="9" y1="4" x2="9" y2="18" stroke={active ? '#00f0ff' : 'currentColor'} strokeWidth="1" opacity="0.4" />
+        <line x1="15" y1="6" x2="15" y2="20" stroke={active ? '#00f0ff' : 'currentColor'} strokeWidth="1" opacity="0.4" />
+      </svg>
+    ),
+  },
+  {
     id: 'create',
     label: 'Criar',
     icon: (active) => (

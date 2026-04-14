@@ -13,6 +13,7 @@ import VibePing from './components/VibePing';
 import ReportModal from './components/ReportModal';
 import InstallPrompt from './components/InstallPrompt';
 import BottomNav from './components/BottomNav';
+import MapView from './components/MapView';
 import ProfilePage from './components/ProfilePage';
 import SettingsPage from './components/SettingsPage';
 import { useGeolocation } from './hooks/useGeolocation';
@@ -549,6 +550,16 @@ export default function App() {
             <VibePing onPing={handleVibePing} />
           </div>
         </>
+      )}
+
+      {/* ── Tab: Map ── */}
+      {activeTab === 'map' && (
+        <MapView
+          lat={geo.lat}
+          lng={geo.lng}
+          capsules={nearbyCapsules}
+          onSelectCapsule={(cap) => { setSelectedCapsule(cap); }}
+        />
       )}
 
       {/* ── Tab: Profile ── */}
