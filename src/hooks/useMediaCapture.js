@@ -14,27 +14,30 @@ export function useMediaCapture() {
   const chunksRef = useRef([]);
 
   // ── Capture photo + NSFW scan ──
+  // We intentionally do NOT call getUserMedia here: AR.js already holds the
+  // camera and a second consumer breaks on iOS Safari and on Androids that
+  // return NotReadableError when two streams target the same device.
+  // Instead we grab the frame straight off AR.js's own <video> element,
+  // which is always mounted on the live scene.
   const capturePhoto = useCallback(async () => {
     setModerationError(null);
 
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 960 } },
-      });
+      const arVideo =
+        document.querySelector('a-scene video') ||
+        document.querySelector('#arjs-video') ||
+        document.querySelector('video[autoplay][playsinline]');
 
-      const video = document.createElement('video');
-      video.srcObject = stream;
-      video.setAttribute('playsinline', '');
-      await video.play();
-
-      await new Promise((r) => setTimeout(r, 300));
+      if (!arVideo || !arVideo.videoWidth) {
+        console.error('[XPortl] AR video element not ready for capture');
+        setModerationError('Camera ainda inicializando. Tente novamente em 2 segundos.');
+        return null;
+      }
 
       const canvas = document.createElement('canvas');
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      canvas.getContext('2d').drawImage(video, 0, 0);
-
-      stream.getTracks().forEach((t) => t.stop());
+      canvas.width = arVideo.videoWidth;
+      canvas.height = arVideo.videoHeight;
+      canvas.getContext('2d').drawImage(arVideo, 0, 0);
 
       const preview = canvas.toDataURL('image/webp', 0.5);
 

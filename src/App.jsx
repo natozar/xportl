@@ -342,6 +342,7 @@ export default function App() {
       setLastScan(new Date().toLocaleTimeString('pt-BR'));
     } catch (err) {
       console.error('[XPortl] Failed to create capsule:', err);
+      alert('Falha ao criar capsula: ' + (err?.message || 'erro desconhecido'));
     } finally {
       setSaving(false);
     }
