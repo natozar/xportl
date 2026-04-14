@@ -1,6 +1,48 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 
 const MAX_VIDEO_SECONDS = 15;
+const MAX_IMAGE_DIMENSION = 1600;      // px on the longer side
+const IMAGE_QUALITY = 0.82;            // webp quality after resize
+const VIDEO_BITRATE = 1_500_000;       // 1.5 Mbps ≈ 2.8 MB for 15s
+const AUDIO_BITRATE = 64_000;          // 64 kbps
+const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;  // 5 MB hard cap
+
+// Resize + re-encode a source canvas so large phone captures don't bloat
+// Storage. Returns { previewUrl, blob } or rejects if blob > MAX_UPLOAD_BYTES.
+function compressCanvasToWebp(source, facing) {
+  return new Promise((resolve, reject) => {
+    const sw = source.width;
+    const sh = source.height;
+    const scale = Math.min(1, MAX_IMAGE_DIMENSION / Math.max(sw, sh));
+    const dw = Math.round(sw * scale);
+    const dh = Math.round(sh * scale);
+
+    const out = document.createElement('canvas');
+    out.width = dw;
+    out.height = dh;
+    const ctx = out.getContext('2d');
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    if (facing === 'user') {
+      ctx.translate(dw, 0);
+      ctx.scale(-1, 1);
+    }
+    ctx.drawImage(source, 0, 0, dw, dh);
+
+    const previewUrl = out.toDataURL('image/webp', IMAGE_QUALITY);
+    out.toBlob(
+      (blob) => {
+        if (!blob) return reject(new Error('Falha ao codificar imagem'));
+        if (blob.size > MAX_UPLOAD_BYTES) {
+          return reject(new Error('Imagem muito grande mesmo apos compressao'));
+        }
+        resolve({ previewUrl, blob });
+      },
+      'image/webp',
+      IMAGE_QUALITY
+    );
+  });
+}
 
 /**
  * Fullscreen camera with live preview, front/back toggle, photo mode,
@@ -37,12 +79,14 @@ export default function CameraModal({ onClose, onCapture, initialMode = 'photo' 
           streamRef.current.getTracks().forEach((t) => t.stop());
           streamRef.current = null;
         }
+        // Photo mode wants high res (we compress to 1600px after snap).
+        // Video mode caps at 720p to keep 15s clips under ~3 MB encoded.
+        const videoConstraints = mode === 'video'
+          ? { facingMode: facing, width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 24, max: 30 } }
+          : { facingMode: facing, width: { ideal: 1920 }, height: { ideal: 1440 } };
+
         const stream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            facingMode: facing,
-            width: { ideal: 1920 },
-            height: { ideal: 1440 },
-          },
+          video: videoConstraints,
           audio: mode === 'video',
         });
         if (cancelled) {
@@ -88,34 +132,29 @@ export default function CameraModal({ onClose, onCapture, initialMode = 'photo' 
     setMode((m) => (m === 'photo' ? 'video' : 'photo'));
   }, []);
 
-  const snapPhoto = useCallback(() => {
+  const snapPhoto = useCallback(async () => {
     const video = videoRef.current;
     if (!video || !video.videoWidth) return;
 
-    const canvas = document.createElement('canvas');
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    const ctx = canvas.getContext('2d');
-    if (facing === 'user') {
-      ctx.translate(canvas.width, 0);
-      ctx.scale(-1, 1);
-    }
-    ctx.drawImage(video, 0, 0);
+    // Draw the raw frame first (no mirroring — compressCanvasToWebp handles it)
+    const raw = document.createElement('canvas');
+    raw.width = video.videoWidth;
+    raw.height = video.videoHeight;
+    raw.getContext('2d').drawImage(video, 0, 0);
 
-    const previewUrl = canvas.toDataURL('image/webp', 0.92);
-    canvas.toBlob(
-      (blob) => {
-        if (!blob) return;
-        setPreview({ blob, type: 'image', previewUrl });
-        // Stop the live stream while user decides; restart on retake.
-        if (streamRef.current) {
-          streamRef.current.getTracks().forEach((t) => t.stop());
-          streamRef.current = null;
-        }
-      },
-      'image/webp',
-      0.92
-    );
+    try {
+      const { previewUrl, blob } = await compressCanvasToWebp(raw, facing);
+      setPreview({ blob, type: 'image', previewUrl });
+    } catch (err) {
+      setError(err.message || 'Erro ao processar foto');
+      return;
+    }
+
+    // Stop live stream while user decides; restart on retake.
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
+    }
   }, [facing]);
 
   const startVideo = useCallback(() => {
@@ -128,12 +167,20 @@ export default function CameraModal({ onClose, onCapture, initialMode = 'photo' 
           : MediaRecorder.isTypeSupported('video/webm;codecs=vp8,opus')
           ? 'video/webm;codecs=vp8,opus'
           : 'video/webm',
+        videoBitsPerSecond: VIDEO_BITRATE,
+        audioBitsPerSecond: AUDIO_BITRATE,
       });
       recorder.ondataavailable = (e) => {
         if (e.data.size > 0) chunksRef.current.push(e.data);
       };
       recorder.onstop = async () => {
         const blob = new Blob(chunksRef.current, { type: 'video/webm' });
+        if (blob.size > MAX_UPLOAD_BYTES) {
+          setError(`Video muito grande (${(blob.size / 1024 / 1024).toFixed(1)} MB). Limite: 5 MB.`);
+          chunksRef.current = [];
+          setPreview(null);
+          return;
+        }
         const previewUrl = URL.createObjectURL(blob);
         setPreview({ blob, type: 'video', previewUrl });
         if (streamRef.current) {
