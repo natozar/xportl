@@ -54,12 +54,51 @@ function compressCanvasToWebp(source, facing) {
  *     ready for upload, preview is a data URL for the panel thumbnail.
  *   initialMode: 'photo'|'video' (default 'photo')
  */
+function findArVideo() {
+  return (
+    document.querySelector('a-scene video') ||
+    document.querySelector('#arjs-video') ||
+    document.querySelector('video[autoplay][playsinline]')
+  );
+}
+
+// Release AR.js's camera so our getUserMedia can grab the same device.
+// iOS/Android reject a second consumer on the back camera with
+// NotReadableError, so the modal must own the stream exclusively while open.
+function releaseArCamera() {
+  const arVideo = findArVideo();
+  if (!arVideo) return null;
+  const stream = arVideo.srcObject;
+  if (stream && stream.getTracks) {
+    stream.getTracks().forEach((t) => t.stop());
+  }
+  try { arVideo.pause(); } catch (_) { /* ignore */ }
+  arVideo.srcObject = null;
+  return arVideo;
+}
+
+// Re-acquire the back camera and hand it back to AR.js's <video>.
+// Fire and forget: if AR fails to restart the user can reload the app.
+function restoreArCamera(arVideo) {
+  if (!arVideo) return;
+  navigator.mediaDevices
+    .getUserMedia({ video: { facingMode: 'environment' }, audio: false })
+    .then((stream) => {
+      arVideo.srcObject = stream;
+      return arVideo.play().catch(() => {});
+    })
+    .catch((err) => {
+      console.warn('[XPortl] Failed to restore AR camera:', err);
+    });
+}
+
 export default function CameraModal({ onClose, onCapture, initialMode = 'photo' }) {
   const videoRef = useRef(null);
   const streamRef = useRef(null);
   const recorderRef = useRef(null);
   const chunksRef = useRef([]);
   const recordStartRef = useRef(0);
+  const arVideoRef = useRef(null);
 
   const [facing, setFacing] = useState('environment');
   const [mode, setMode] = useState(initialMode);
@@ -68,7 +107,13 @@ export default function CameraModal({ onClose, onCapture, initialMode = 'photo' 
   const [preview, setPreview] = useState(null); // { blob, type, previewUrl }
   const [error, setError] = useState(null);
 
-  // (re)open stream when facing changes
+  // Release AR.js's camera once on mount so the modal can own the device.
+  // Stored ref is restored on unmount by the cleanup effect below.
+  useEffect(() => {
+    arVideoRef.current = releaseArCamera();
+  }, []);
+
+  // (re)open stream when facing / mode changes
   useEffect(() => {
     if (preview) return; // paused in preview state
     let cancelled = false;
@@ -79,6 +124,11 @@ export default function CameraModal({ onClose, onCapture, initialMode = 'photo' 
           streamRef.current.getTracks().forEach((t) => t.stop());
           streamRef.current = null;
         }
+
+        // Give iOS a beat to release the device handle after we stopped
+        // whatever was holding it (AR.js or our own previous stream).
+        await new Promise((r) => setTimeout(r, 150));
+
         // Photo mode wants high res (we compress to 1600px after snap).
         // Video mode caps at 720p to keep 15s clips under ~3 MB encoded.
         const videoConstraints = mode === 'video'
@@ -101,7 +151,15 @@ export default function CameraModal({ onClose, onCapture, initialMode = 'photo' 
           try { await videoRef.current.play(); } catch (_) { /* iOS */ }
         }
       } catch (err) {
-        setError(err.message || 'Camera bloqueada. Verifique as permissoes.');
+        console.error('[XPortl] CameraModal getUserMedia failed:', err);
+        const name = err?.name || 'Error';
+        const msg =
+          name === 'NotAllowedError' ? 'Permissao de camera negada.' :
+          name === 'NotFoundError'   ? 'Nenhuma camera encontrada.' :
+          name === 'NotReadableError' ? 'Camera em uso por outro app/aba. Feche e tente de novo.' :
+          name === 'OverconstrainedError' ? 'Este dispositivo nao suporta a resolucao pedida.' :
+          (err?.message || 'Erro ao abrir camera.');
+        setError(msg);
       }
     })();
 
@@ -119,6 +177,13 @@ export default function CameraModal({ onClose, onCapture, initialMode = 'photo' 
       }
       if (preview?.previewUrl && preview.type === 'video') {
         URL.revokeObjectURL(preview.previewUrl);
+      }
+      // Hand the camera back to AR.js after a short delay so iOS releases
+      // the lock between our teardown and AR's re-acquire.
+      const arVideo = arVideoRef.current;
+      arVideoRef.current = null;
+      if (arVideo) {
+        setTimeout(() => restoreArCamera(arVideo), 200);
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
