@@ -305,7 +305,8 @@ export default function LeaveTraceButton({ onPress, saving }) {
 
 const st = {
   fab: {
-    position: 'fixed', bottom: 32, left: '50%', transform: 'translateX(-50%)',
+    position: 'fixed', bottom: 'calc(32px + env(safe-area-inset-bottom, 0px))',
+    left: '50%', transform: 'translateX(-50%)',
     zIndex: 35, pointerEvents: 'auto', width: 56, height: 56, borderRadius: '50%',
     background: 'rgba(0,255,136,0.12)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
     border: '1px solid rgba(0,255,136,0.3)', color: '#00ff88',
@@ -313,7 +314,8 @@ const st = {
     boxShadow: '0 0 30px rgba(0,255,136,0.15)',
   },
   toast: {
-    position: 'fixed', bottom: 100, left: '50%', transform: 'translateX(-50%)',
+    position: 'fixed', bottom: 'calc(100px + env(safe-area-inset-bottom, 0px))',
+    left: '50%', transform: 'translateX(-50%)',
     zIndex: 40, pointerEvents: 'none',
   },
   toastInner: {

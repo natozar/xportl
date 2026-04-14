@@ -38,7 +38,7 @@ export default function Radar({ lat, lng, altitude, nearbyCount = 0 }) {
 const s = {
   container: {
     position: 'fixed',
-    bottom: 96,
+    bottom: 'calc(96px + env(safe-area-inset-bottom, 0px))',
     left: 14,
     zIndex: 32,
     pointerEvents: 'auto',

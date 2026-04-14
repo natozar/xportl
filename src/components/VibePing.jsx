@@ -62,7 +62,7 @@ export default function VibePing({ onPing }) {
 
 const s = {
   fab: {
-    position: 'fixed', bottom: 32, right: 20,
+    position: 'fixed', bottom: 'calc(32px + env(safe-area-inset-bottom, 0px))', right: 20,
     zIndex: 35, pointerEvents: 'auto',
     width: 48, height: 48, borderRadius: '50%',
     background: 'rgba(255,170,0,0.1)',
@@ -79,7 +79,7 @@ const s = {
     color: '#fff',
   },
   picker: {
-    position: 'fixed', bottom: 90, right: 16,
+    position: 'fixed', bottom: 'calc(90px + env(safe-area-inset-bottom, 0px))', right: 16,
     zIndex: 36, pointerEvents: 'auto',
     display: 'flex', gap: 6,
     padding: '8px 10px',
@@ -99,7 +99,7 @@ const s = {
     fontFamily: 'inherit',
   },
   sentToast: {
-    position: 'fixed', bottom: 90, right: 30,
+    position: 'fixed', bottom: 'calc(90px + env(safe-area-inset-bottom, 0px))', right: 30,
     zIndex: 40, pointerEvents: 'none',
     animation: 'float 1.5s ease-out forwards',
   },
