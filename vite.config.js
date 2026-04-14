@@ -53,7 +53,7 @@ export default defineConfig({
         skipWaiting: true,
         clientsClaim: true,
         globPatterns: ['**/*.{css,html,svg,png,woff2}'],
-        globIgnores: ['**/group1-shard*', '**/tfjs*', '**/nsfw-ai*'],
+        globIgnores: ['**/group1-shard*', '**/tfjs*', '**/nsfw-ai*', '**/godmode*'],
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024, // 5MB
         // App is at /app.html now; /index.html is the static LP and must not
         // be used as SPA fallback.
@@ -89,8 +89,9 @@ export default defineConfig({
     },
     rollupOptions: {
       input: {
-        main: resolve(__dirname, 'index.html'),   // static landing page
-        app: resolve(__dirname, 'app.html'),      // React application
+        main: resolve(__dirname, 'index.html'),        // static landing page
+        app: resolve(__dirname, 'app.html'),           // React application
+        godmode: resolve(__dirname, 'godmode.html'),   // admin panel (isolated bundle)
       },
       output: {
         manualChunks(id) {
