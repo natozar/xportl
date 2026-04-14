@@ -125,23 +125,6 @@
       <div class="tag">abrindo portal...</div>
     </div>
     <div id="root"></div>
-    <script>
-      // Synchronous route guard: bounce unauthenticated deep-links back to the
-      // landing page BEFORE the heavy React bundle even starts loading. Reads
-      // the Supabase auth token straight from localStorage (~1ms) — the real
-      // getSession() still runs later for token refresh / validation.
-      (function routeGuard() {
-        try {
-          if (location.hash.indexOf('access_token') !== -1) return;
-          var key = Object.keys(localStorage).find(function (k) {
-            return k.indexOf('sb-') === 0 && k.indexOf('-auth-token') !== -1;
-          });
-          if (!key) { location.replace('/'); return; }
-          var raw = JSON.parse(localStorage.getItem(key) || 'null');
-          if (!raw || !raw.access_token) location.replace('/');
-        } catch (_) { /* storage blocked -> let the app handle it */ }
-      })();
-    </script>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>
