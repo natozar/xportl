@@ -6,6 +6,9 @@
     <meta name="theme-color" content="#0d0a1a" />
     <meta name="description" content="XPortl - A Realidade Aumentada de Capsulas do Tempo" />
 
+    <!-- PWA: Android / General capable -->
+    <meta name="mobile-web-app-capable" content="yes" />
+
     <!-- PWA: iOS -->
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
@@ -37,12 +40,90 @@
 
     <title>XPortl</title>
 
-    <!-- A-Frame + AR.js -->
-    <script src="https://aframe.io/releases/1.3.0/aframe.min.js" crossorigin="anonymous"></script>
-    <script src="https://unpkg.com/aframe-look-at-component@0.8.0/dist/aframe-look-at-component.min.js" crossorigin="anonymous"></script>
-    <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js" crossorigin="anonymous"></script>
+    <!-- A-Frame + AR.js (defer so they don't block First Paint) -->
+    <script defer src="https://aframe.io/releases/1.3.0/aframe.min.js" crossorigin="anonymous"></script>
+    <script defer src="https://unpkg.com/aframe-look-at-component@0.8.0/dist/aframe-look-at-component.min.js" crossorigin="anonymous"></script>
+    <script defer src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js" crossorigin="anonymous"></script>
+
+    <!-- App Shell: instant paint while JS boots -->
+    <style>
+      html, body {
+        margin: 0;
+        padding: 0;
+        background: #0d0a1a;
+        color: #fff;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        min-height: 100vh;
+        overscroll-behavior: none;
+      }
+      #app-shell {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 28px;
+        background:
+          radial-gradient(circle at 50% 40%, rgba(0, 240, 255, 0.08), transparent 60%),
+          radial-gradient(circle at 50% 80%, rgba(180, 74, 255, 0.06), transparent 55%),
+          #0d0a1a;
+        z-index: 9999;
+        transition: opacity 0.45s ease;
+      }
+      #app-shell.hidden { opacity: 0; pointer-events: none; }
+      #app-shell .portal {
+        width: 120px;
+        height: 120px;
+        border-radius: 50%;
+        border: 1px solid rgba(0, 240, 255, 0.35);
+        box-shadow:
+          0 0 60px rgba(0, 240, 255, 0.25),
+          inset 0 0 40px rgba(0, 240, 255, 0.15);
+        position: relative;
+        animation: shell-pulse 2.4s ease-in-out infinite;
+      }
+      #app-shell .portal::before,
+      #app-shell .portal::after {
+        content: '';
+        position: absolute;
+        inset: 14px;
+        border-radius: 50%;
+        border: 1px solid rgba(180, 74, 255, 0.3);
+      }
+      #app-shell .portal::after {
+        inset: 34px;
+        border-color: rgba(0, 240, 255, 0.5);
+      }
+      #app-shell .brand {
+        font-size: 0.85rem;
+        letter-spacing: 0.5em;
+        color: #00f0ff;
+        text-shadow: 0 0 20px rgba(0, 240, 255, 0.4);
+        font-weight: 700;
+      }
+      #app-shell .tag {
+        font-size: 0.65rem;
+        letter-spacing: 0.2em;
+        color: rgba(255, 255, 255, 0.35);
+        text-transform: uppercase;
+      }
+      @keyframes shell-pulse {
+        0%, 100% { transform: scale(1); opacity: 0.85; }
+        50%      { transform: scale(1.06); opacity: 1; }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        #app-shell .portal { animation: none; }
+        #app-shell.hidden { transition: none; }
+      }
+    </style>
   </head>
   <body>
+    <div id="app-shell" aria-hidden="true">
+      <div class="portal"></div>
+      <div class="brand">XPORTL</div>
+      <div class="tag">abrindo portal...</div>
+    </div>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>

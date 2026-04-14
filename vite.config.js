@@ -7,6 +7,8 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
+      injectRegister: false, // we call registerSW() explicitly in main.jsx
+      devOptions: { enabled: true, type: 'module' },
       includeAssets: ['favicon.svg', 'icons/*.png'],
       manifest: {
         id: '/',
