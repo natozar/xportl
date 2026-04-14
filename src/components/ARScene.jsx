@@ -38,15 +38,15 @@ export default function ARScene({ capsules, pings, onCapsuleClick, onVortexClick
 
       if (!aframeReady || !gpsReady) {
         attempts += 1;
-        if (attempts > 75) {
+        if (attempts > 50) {
           console.error(
-            '[XPortl] AR.js scripts failed to load after 15s. ' +
+            '[XPortl] AR.js scripts failed to load after 5s. ' +
             'AFRAME:', !!window.AFRAME,
             'gps-camera component:', !!window.AFRAME?.components?.['gps-camera']
           );
           return;
         }
-        setTimeout(tryInit, 200);
+        setTimeout(tryInit, 100);
         return;
       }
 
@@ -64,7 +64,7 @@ export default function ARScene({ capsules, pings, onCapsuleClick, onVortexClick
     const scene = document.createElement('a-scene');
     scene.setAttribute('vr-mode-ui', 'enabled: false');
     scene.setAttribute('renderer', 'antialias: true; alpha: true; logarithmicDepthBuffer: true');
-    scene.setAttribute('arjs', 'sourceType: webcam; debugUIEnabled: false; videoTexture: true');
+    scene.setAttribute('arjs', 'sourceType: webcam; debugUIEnabled: false; videoTexture: true; sourceWidth: 1920; sourceHeight: 1080');
 
     const camera = document.createElement('a-camera');
     camera.setAttribute('gps-camera', buildGpsCameraAttr());

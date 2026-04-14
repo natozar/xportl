@@ -208,12 +208,13 @@ export default function App() {
     && hasAcceptedTos(profile) && hasAcceptedLocationDisclaimer(profile);
 
   useEffect(() => {
-    if (permissionsGranted && legalGatesCleared) {
+    if (permissionsGranted && legalGatesCleared && !ready) {
+      // Release our preview stream immediately so AR.js can grab the camera
       cam.release();
-      const t = setTimeout(() => setReady(true), 600);
-      return () => clearTimeout(t);
+      // Mount AR scene instantly — no artificial delay
+      setReady(true);
     }
-  }, [permissionsGranted, legalGatesCleared]);
+  }, [permissionsGranted, legalGatesCleared, ready]);
 
   // ── Polling (safety net) ──
   useEffect(() => {
@@ -492,5 +493,5 @@ export default function App() {
 
 const styles = {
   root: { width: '100%', height: '100%', position: 'relative' },
-  overlay: { position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 30 },
+  overlay: { position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 9999 },
 };

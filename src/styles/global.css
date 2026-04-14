@@ -82,7 +82,7 @@ code, .mono, [style*="monospace"] {
     rgba(0, 0, 0, 0.015) 6px
   );
   pointer-events: none;
-  z-index: 25;
+  z-index: 5;
 }
 
 /* ── A-Frame overrides ── */
@@ -90,21 +90,39 @@ code, .mono, [style*="monospace"] {
   display: none !important;
 }
 
+/* AR scene sits at z-index 0 — all UI overlays must be above this */
 a-scene {
   position: fixed !important;
   inset: 0 !important;
   z-index: 0 !important;
 }
 
+/* Canvas must NOT capture pointer events that belong to UI buttons */
 a-scene canvas {
   position: fixed !important;
   inset: 0 !important;
+  z-index: 0 !important;
 }
 
+/* Camera video feed fills viewport */
 a-scene video {
   position: fixed !important;
   inset: 0 !important;
   object-fit: cover !important;
+  z-index: 0 !important;
+}
+
+/* A-Frame injects wrapper divs that can steal clicks — neutralize them */
+.a-canvas {
+  z-index: 0 !important;
+}
+
+/* Ensure the A-Frame overlay container doesn't block our UI */
+a-scene .a-loader-title,
+a-scene .a-enter-vr-button,
+a-scene .a-enter-ar-button,
+a-scene .a-orientation-modal {
+  display: none !important;
 }
 
 /* ── Animations ── */

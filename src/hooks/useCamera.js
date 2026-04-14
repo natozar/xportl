@@ -18,8 +18,14 @@ export function useCamera() {
     setState(s => ({ ...s, loading: true }));
 
     try {
+      // Force HD rear camera — this sets the quality baseline before AR.js takes over
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment' },
+        video: {
+          facingMode: { ideal: 'environment' },
+          width: { ideal: 1920, min: 1280 },
+          height: { ideal: 1080, min: 720 },
+          frameRate: { ideal: 30 },
+        },
         audio: false,
       });
 
@@ -41,7 +47,6 @@ export function useCamera() {
     }
   }, []);
 
-  // Release the stream so AR.js can take over the camera
   const release = useCallback(() => {
     setState((s) => {
       if (s.stream) {

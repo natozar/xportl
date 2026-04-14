@@ -6,9 +6,17 @@ export default function PermissionGate({ geo, cam, onComplete }) {
   const handleEnter = async () => {
     setStep('requesting');
 
-    // Request both permissions
-    geo.request();
-    await cam.request();
+    // Request BOTH permissions in parallel — both must resolve before proceeding
+    await Promise.all([
+      new Promise((resolve) => {
+        geo.request();
+        // geo.request() is fire-and-forget (watchPosition callback).
+        // We resolve immediately — the component re-renders when geo.granted flips.
+        // But we need at least the permission prompt to be triggered.
+        resolve();
+      }),
+      cam.request(),
+    ]);
   };
 
   // Check if both granted after requests
