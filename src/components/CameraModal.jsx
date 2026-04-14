@@ -447,16 +447,19 @@ export default function CameraModal({ onClose, onCapture, initialMode = 'photo' 
                 }} />
               </button>
               <button
-                style={s.flipBtn}
+                style={{ ...s.flipBtn, ...(recording ? { opacity: 0.35 } : {}) }}
                 onClick={toggleFacing}
                 disabled={recording}
                 aria-label="Virar camera"
               >
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M3 7h3l2-2h8l2 2h3v12H3z" />
-                  <path d="M8 12a4 4 0 1 0 8 0 4 4 0 1 0-8 0" />
-                  <path d="M12 4v3M12 17v3" />
+                <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  {/* Curved double-arrow flip glyph */}
+                  <path d="M4 10a8 8 0 0 1 14-5" />
+                  <path d="M20 14a8 8 0 0 1-14 5" />
+                  <polyline points="18 1 18 6 13 6" />
+                  <polyline points="6 23 6 18 11 18" />
                 </svg>
+                <span style={s.flipLabel}>{facing === 'environment' ? 'traseira' : 'frontal'}</span>
               </button>
             </div>
           </div>
@@ -571,7 +574,7 @@ const s = {
     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
     gap: 20,
   },
-  sideSlot: { width: 52 },
+  sideSlot: { width: 68 },
   shutter: {
     width: 76, height: 76, borderRadius: '50%',
     background: 'rgba(255,255,255,0.08)', border: '3px solid #fff',
@@ -586,10 +589,16 @@ const s = {
   shutterCircleRed: { background: '#ff3366', width: 58, height: 58 },
   shutterSquare: { background: '#ff3366', width: 28, height: 28, borderRadius: 6 },
   flipBtn: {
-    width: 52, height: 52, borderRadius: '50%',
-    background: 'rgba(255,255,255,0.08)', color: '#fff',
-    border: '1px solid rgba(255,255,255,0.18)', cursor: 'pointer',
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    width: 68, height: 68, borderRadius: '50%',
+    background: 'rgba(0,240,255,0.1)', color: '#00f0ff',
+    border: '1.5px solid rgba(0,240,255,0.4)', cursor: 'pointer',
+    display: 'flex', flexDirection: 'column', alignItems: 'center',
+    justifyContent: 'center', gap: 2, padding: 0, flexShrink: 0,
+    boxShadow: '0 0 20px rgba(0,240,255,0.15)',
+  },
+  flipLabel: {
+    fontSize: '0.5rem', letterSpacing: '0.08em', textTransform: 'uppercase',
+    fontWeight: 600, opacity: 0.85,
   },
   previewActions: {
     display: 'flex', gap: 12, justifyContent: 'center',
