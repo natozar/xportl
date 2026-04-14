@@ -50,19 +50,46 @@ export function validateContent(text) {
   return { allowed: true };
 }
 
+// Default rate limits (fallback if feature_flags not available)
+const DEFAULT_LIMITS = {
+  create_capsule: { max: 10, windowMin: 60 },
+  create_ping: { max: 20, windowMin: 60 },
+  report: { max: 15, windowMin: 60 },
+  upload_media: { max: 5, windowMin: 60 },
+};
+
+// Cache the remote config for 5 minutes
+let _remoteLimitsCache = null;
+let _remoteLimitsCacheTime = 0;
+
+async function getRateLimits() {
+  const now = Date.now();
+  if (_remoteLimitsCache && now - _remoteLimitsCacheTime < 300000) return _remoteLimitsCache;
+
+  try {
+    const { data } = await supabase
+      .from('feature_flags')
+      .select('value')
+      .eq('key', 'rate_limits')
+      .single();
+
+    if (data?.value) {
+      _remoteLimitsCache = data.value;
+      _remoteLimitsCacheTime = now;
+      return data.value;
+    }
+  } catch (_) { /* fail silently, use defaults */ }
+
+  return DEFAULT_LIMITS;
+}
+
 /**
  * Check rate limit for an action.
- * Returns { allowed: true } or { allowed: false, retryAfter: string }
+ * Reads limits from feature_flags (cached 5min), falls back to hardcoded defaults.
  */
 export async function checkRateLimit(userId, action) {
-  const limits = {
-    create_capsule: { max: 10, windowMin: 60 },
-    create_ping: { max: 20, windowMin: 60 },
-    report: { max: 15, windowMin: 60 },
-    upload_media: { max: 5, windowMin: 60 },
-  };
-
-  const limit = limits[action];
+  const limits = await getRateLimits();
+  const limit = limits[action] || DEFAULT_LIMITS[action];
   if (!limit) return { allowed: true };
 
   const { data, error } = await supabase.rpc('check_rate_limit', {

@@ -181,7 +181,7 @@ export async function getNearbyCapsules(lat, lng, radiusMeters = 50) {
   const degreeRadius = radiusMeters / 111000;
   const { data: rawData, error: selectError } = await supabase
     .from('capsules')
-    .select('id, lat, lng, altitude, content, visibility_layer, unlock_date, views_count, views_left, media_url, media_type, created_at')
+    .select('id, lat, lng, altitude, content, visibility_layer, unlock_date, views_count, views_left, media_url, media_type, created_at, created_by, moderation_status')
     .gte('lat', lat - degreeRadius)
     .lte('lat', lat + degreeRadius)
     .gte('lng', lng - degreeRadius)
@@ -192,6 +192,7 @@ export async function getNearbyCapsules(lat, lng, radiusMeters = 50) {
   return (rawData || [])
     .filter((c) => {
       if (c.views_left !== null && c.views_left <= 0) return false;
+      if (c.moderation_status && c.moderation_status !== 'active') return false;
       return true;
     })
     .map((c) => ({
