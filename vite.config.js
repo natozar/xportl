@@ -1,4 +1,5 @@
 import { defineConfig } from 'vite';
+import { resolve } from 'path';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 
@@ -20,7 +21,10 @@ export default defineConfig({
         display: 'standalone',
         display_override: ['standalone', 'fullscreen'],
         orientation: 'portrait',
-        start_url: '/',
+        // id stays '/' to preserve existing PWA installs (changing id spawns a
+        // duplicate icon). scope stays '/' so users can navigate to the LP
+        // from inside the installed app if they want. Only start_url moves.
+        start_url: '/app',
         scope: '/',
         categories: ['games', 'social', 'entertainment'],
         lang: 'pt-BR',
@@ -51,7 +55,10 @@ export default defineConfig({
         globPatterns: ['**/*.{css,html,svg,png,woff2}'],
         globIgnores: ['**/group1-shard*', '**/tfjs*', '**/nsfw-ai*'],
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024, // 5MB
-        navigateFallback: '/index.html',
+        // App is at /app.html now; /index.html is the static LP and must not
+        // be used as SPA fallback.
+        navigateFallback: '/app.html',
+        navigateFallbackDenylist: [/^\/$/, /^\/index\.html$/, /^\/landing/],
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/(aframe\.io|unpkg\.com|raw\.githack\.com|cdn\.jsdelivr\.net|cdn\.aframe\.io)\/.*/i,
@@ -81,6 +88,10 @@ export default defineConfig({
         deps.filter((d) => !d.includes('nsfw-ai')),
     },
     rollupOptions: {
+      input: {
+        main: resolve(__dirname, 'index.html'),   // static landing page
+        app: resolve(__dirname, 'app.html'),      // React application
+      },
       output: {
         manualChunks(id) {
           // Isolate TensorFlow.js into its own lazy-loaded chunk

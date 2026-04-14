@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <meta name="theme-color" content="#0d0a1a" />
+    <meta name="description" content="XPortl - A Realidade Aumentada de Capsulas do Tempo" />
+
+    <!-- PWA: Android / General capable -->
+    <meta name="mobile-web-app-capable" content="yes" />
+
+    <!-- PWA: iOS -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="XPortl" />
+    <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+    <!-- iOS splash screens (covers most devices) -->
+    <link rel="apple-touch-startup-image" href="/icons/icon-512.png"
+      media="(device-width: 390px) and (device-height: 844px) and (-webkit-device-pixel-ratio: 3)" />
+    <link rel="apple-touch-startup-image" href="/icons/icon-512.png"
+      media="(device-width: 430px) and (device-height: 932px) and (-webkit-device-pixel-ratio: 3)" />
+    <link rel="apple-touch-startup-image" href="/icons/icon-512.png"
+      media="(device-width: 393px) and (device-height: 852px) and (-webkit-device-pixel-ratio: 3)" />
+
+    <!-- PWA: Android / General -->
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+
+    <!-- CSP -->
+    <meta http-equiv="Content-Security-Policy" content="
+      default-src 'self';
+      script-src 'self' 'unsafe-eval' 'unsafe-inline' https://aframe.io https://unpkg.com https://raw.githack.com https://cdn.jsdelivr.net;
+      style-src 'self' 'unsafe-inline';
+      img-src 'self' data: blob: https://*.supabase.co;
+      media-src 'self' blob: https://*.supabase.co;
+      connect-src 'self' https://*.supabase.co wss://*.supabase.co https://aframe.io https://unpkg.com https://raw.githack.com https://cdn.jsdelivr.net;
+      font-src 'self' https://cdn.aframe.io;
+      worker-src 'self' blob:;
+    " />
+
+    <title>XPortl</title>
+
+    <!-- A-Frame + AR.js (defer so they don't block First Paint) -->
+    <script defer src="https://aframe.io/releases/1.3.0/aframe.min.js" crossorigin="anonymous"></script>
+    <script defer src="https://unpkg.com/aframe-look-at-component@0.8.0/dist/aframe-look-at-component.min.js" crossorigin="anonymous"></script>
+    <script defer src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js" crossorigin="anonymous"></script>
+
+    <!-- App Shell: instant paint while JS boots -->
+    <style>
+      html, body {
+        margin: 0;
+        padding: 0;
+        background: #0d0a1a;
+        color: #fff;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        min-height: 100vh;
+        overscroll-behavior: none;
+      }
+      #app-shell {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 28px;
+        background:
+          radial-gradient(circle at 50% 40%, rgba(0, 240, 255, 0.08), transparent 60%),
+          radial-gradient(circle at 50% 80%, rgba(180, 74, 255, 0.06), transparent 55%),
+          #0d0a1a;
+        z-index: 9999;
+        transition: opacity 0.45s ease;
+      }
+      #app-shell.hidden { opacity: 0; pointer-events: none; }
+      #app-shell .portal {
+        width: 120px;
+        height: 120px;
+        border-radius: 50%;
+        border: 1px solid rgba(0, 240, 255, 0.35);
+        box-shadow:
+          0 0 60px rgba(0, 240, 255, 0.25),
+          inset 0 0 40px rgba(0, 240, 255, 0.15);
+        position: relative;
+        animation: shell-pulse 2.4s ease-in-out infinite;
+      }
+      #app-shell .portal::before,
+      #app-shell .portal::after {
+        content: '';
+        position: absolute;
+        inset: 14px;
+        border-radius: 50%;
+        border: 1px solid rgba(180, 74, 255, 0.3);
+      }
+      #app-shell .portal::after {
+        inset: 34px;
+        border-color: rgba(0, 240, 255, 0.5);
+      }
+      #app-shell .brand {
+        font-size: 0.85rem;
+        letter-spacing: 0.5em;
+        color: #00f0ff;
+        text-shadow: 0 0 20px rgba(0, 240, 255, 0.4);
+        font-weight: 700;
+      }
+      #app-shell .tag {
+        font-size: 0.65rem;
+        letter-spacing: 0.2em;
+        color: rgba(255, 255, 255, 0.35);
+        text-transform: uppercase;
+      }
+      @keyframes shell-pulse {
+        0%, 100% { transform: scale(1); opacity: 0.85; }
+        50%      { transform: scale(1.06); opacity: 1; }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        #app-shell .portal { animation: none; }
+        #app-shell.hidden { transition: none; }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app-shell" aria-hidden="true">
+      <div class="portal"></div>
+      <div class="brand">XPORTL</div>
+      <div class="tag">abrindo portal...</div>
+    </div>
+    <div id="root"></div>
+    <script>
+      // Synchronous route guard: bounce unauthenticated deep-links back to the
+      // landing page BEFORE the heavy React bundle even starts loading. Reads
+      // the Supabase auth token straight from localStorage (~1ms) — the real
+      // getSession() still runs later for token refresh / validation.
+      (function routeGuard() {
+        try {
+          if (location.hash.indexOf('access_token') !== -1) return;
+          var key = Object.keys(localStorage).find(function (k) {
+            return k.indexOf('sb-') === 0 && k.indexOf('-auth-token') !== -1;
+          });
+          if (!key) { location.replace('/'); return; }
+          var raw = JSON.parse(localStorage.getItem(key) || 'null');
+          if (!raw || !raw.access_token) location.replace('/');
+        } catch (_) { /* storage blocked -> let the app handle it */ }
+      })();
+    </script>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>
