@@ -1,0 +1,180 @@
+/* ========================================
+   XPLORE — Cyberpunk Clean / Mysterious
+   Vision OS × Cyberpunk 2077
+   ======================================== */
+
+:root {
+  --bg-void: #0a0a0f;
+  --bg-surface: #12121a;
+  --bg-glass: rgba(10, 10, 15, 0.6);
+  --neon-green: #00ff88;
+  --neon-purple: #b44aff;
+  --neon-cyan: #00e5ff;
+  --text-primary: #e8e8f0;
+  --text-muted: #6b6b80;
+  --danger: #ff3366;
+  --radius: 14px;
+  --glow-green: 0 0 20px rgba(0, 255, 136, 0.3);
+  --glow-purple: 0 0 20px rgba(180, 74, 255, 0.3);
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg-void);
+  color: var(--text-primary);
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Inter', 'Segoe UI', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  touch-action: manipulation;
+}
+
+body {
+  overscroll-behavior: none;
+  position: fixed;
+  inset: 0;
+}
+
+/* Monospace for data elements only */
+code, .mono, [style*="monospace"] {
+  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+}
+
+/* ── Utility: glassmorphism ── */
+.glass {
+  background: var(--bg-glass);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  border-radius: var(--radius);
+}
+
+/* ── Neon text ── */
+.neon-green {
+  color: var(--neon-green);
+  text-shadow: var(--glow-green);
+}
+
+.neon-purple {
+  color: var(--neon-purple);
+  text-shadow: var(--glow-purple);
+}
+
+/* ── Scanline overlay — ultra subtle, never blocks interaction ── */
+.scanlines::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 3px,
+    rgba(0, 0, 0, 0.015) 3px,
+    rgba(0, 0, 0, 0.015) 6px
+  );
+  pointer-events: none;
+  z-index: 25;
+}
+
+/* ── A-Frame overrides ── */
+.a-enter-vr, .a-enter-ar, .a-loader-title {
+  display: none !important;
+}
+
+a-scene {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 0 !important;
+}
+
+a-scene canvas {
+  position: fixed !important;
+  inset: 0 !important;
+}
+
+a-scene video {
+  position: fixed !important;
+  inset: 0 !important;
+  object-fit: cover !important;
+}
+
+/* ── Animations ── */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes pulse-ring {
+  0% { transform: scale(0.8); opacity: 0.6; }
+  100% { transform: scale(2.5); opacity: 0; }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+
+@keyframes glitch-flicker {
+  0%, 90%, 100% { opacity: 1; }
+  91% { opacity: 0.2; }
+  93% { opacity: 0.9; transform: translateX(-1px); }
+  95% { opacity: 0.3; transform: translateX(2px); }
+  97% { opacity: 0.7; transform: translateX(-1px); }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slide-up {
+  from { opacity: 0; transform: translateY(100%); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Buttons — clean, no default browser chrome ── */
+button {
+  font-family: inherit;
+  cursor: pointer;
+  border: none;
+  outline: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.btn-primary {
+  background: var(--neon-green);
+  color: var(--bg-void);
+  font-weight: 700;
+  font-size: 0.85rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 14px 28px;
+  border-radius: var(--radius);
+  box-shadow: var(--glow-green);
+  transition: all 0.2s ease;
+}
+
+.btn-primary:active {
+  transform: scale(0.96);
+  box-shadow: 0 0 40px rgba(0, 255, 136, 0.5);
+}
+
+.btn-ghost {
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  padding: 10px 20px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: var(--radius);
+  backdrop-filter: blur(12px);
+}
+
+/* ── Scrollbar — invisible but functional ── */
+::-webkit-scrollbar { width: 3px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.06); border-radius: 3px; }

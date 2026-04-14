@@ -1,0 +1,22 @@
+{
+  "name": "xplore",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Camada Digital Invisivel sobre o mundo real - Location-based AR PWA",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.103.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.4.1",
+    "vite": "^6.3.2",
+    "vite-plugin-pwa": "^1.0.0"
+  }
+}

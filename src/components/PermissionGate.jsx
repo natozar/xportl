@@ -1,0 +1,199 @@
+import React, { useState } from 'react';
+
+export default function PermissionGate({ geo, cam, onComplete }) {
+  const [step, setStep] = useState('welcome'); // welcome | requesting | denied
+
+  const handleEnter = async () => {
+    setStep('requesting');
+
+    // Request both permissions
+    geo.request();
+    await cam.request();
+  };
+
+  // Check if both granted after requests
+  if (geo.granted && cam.granted) {
+    return (
+      <div style={styles.container}>
+        <div style={styles.center}>
+          <div style={{ ...styles.logo, animation: 'float 2s ease-in-out infinite' }}>
+            <span className="neon-green" style={{ fontSize: '2.5rem', fontWeight: 700 }}>X</span>
+          </div>
+          <p className="neon-green" style={{ fontSize: '0.75rem', letterSpacing: '0.3em', marginTop: 16 }}>
+            INICIANDO VISOR...
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  const denied = geo.denied || cam.denied;
+
+  if (denied) {
+    return (
+      <div style={styles.container}>
+        <div style={styles.center}>
+          <div style={styles.iconDenied}>!</div>
+          <h2 style={{ fontSize: '1.1rem', marginBottom: 8, color: 'var(--danger)' }}>
+            Acesso Negado
+          </h2>
+          <p style={styles.subtitle}>
+            O Xplore precisa da sua <strong>camera</strong> e <strong>localização</strong> para
+            revelar os misterios escondidos ao seu redor.
+          </p>
+          {geo.denied && (
+            <p style={styles.errorDetail}>GPS: {geo.error || 'Permissão negada'}</p>
+          )}
+          {cam.denied && (
+            <p style={styles.errorDetail}>Camera: {cam.error || 'Permissão negada'}</p>
+          )}
+          <p style={{ ...styles.subtitle, marginTop: 20, fontSize: '0.7rem' }}>
+            Abra as configurações do navegador e permita o acesso, depois recarregue a pagina.
+          </p>
+          <button
+            className="btn-ghost"
+            style={{ marginTop: 16 }}
+            onClick={() => window.location.reload()}
+          >
+            Tentar novamente
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (step === 'requesting') {
+    return (
+      <div style={styles.container}>
+        <div style={styles.center}>
+          <div style={styles.spinner} />
+          <p style={{ ...styles.subtitle, marginTop: 20 }}>
+            Calibrando sensores...
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // Welcome screen
+  return (
+    <div style={styles.container}>
+      <div style={styles.center}>
+        <div style={styles.logo}>
+          <span className="neon-green" style={{ fontSize: '3rem', fontWeight: 700 }}>X</span>
+        </div>
+        <h1 style={styles.title}>XPLORE</h1>
+        <p style={styles.tagline}>Camada digital invisivel</p>
+        <p style={styles.subtitle}>
+          Descubra misterios escondidos<br />no mundo ao seu redor.
+        </p>
+        <button className="btn-primary" style={{ marginTop: 32 }} onClick={handleEnter}>
+          Ativar Visor
+        </button>
+        <p style={styles.permNote}>
+          Sera necessario acesso a camera e GPS
+        </p>
+      </div>
+      <div style={styles.footer}>
+        <span style={{ color: 'var(--text-muted)', fontSize: '0.6rem', letterSpacing: '0.15em' }}>
+          v0.1.0 // MVP PHASE 1
+        </span>
+      </div>
+    </div>
+  );
+}
+
+const styles = {
+  container: {
+    width: '100%',
+    height: '100%',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    background: 'var(--bg-void)',
+    padding: 32,
+    position: 'relative',
+  },
+  center: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    textAlign: 'center',
+  },
+  logo: {
+    width: 80,
+    height: 80,
+    borderRadius: '50%',
+    border: '2px solid var(--neon-green)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    boxShadow: 'var(--glow-green)',
+  },
+  title: {
+    fontSize: '1.8rem',
+    fontWeight: 700,
+    letterSpacing: '0.35em',
+    marginTop: 20,
+    color: 'var(--text-primary)',
+  },
+  tagline: {
+    fontSize: '0.7rem',
+    letterSpacing: '0.25em',
+    color: 'var(--neon-green)',
+    textTransform: 'uppercase',
+    marginTop: 4,
+    textShadow: 'var(--glow-green)',
+  },
+  subtitle: {
+    fontSize: '0.85rem',
+    color: 'var(--text-muted)',
+    lineHeight: 1.6,
+    marginTop: 16,
+    maxWidth: 280,
+  },
+  permNote: {
+    fontSize: '0.65rem',
+    color: 'var(--text-muted)',
+    marginTop: 12,
+    opacity: 0.6,
+  },
+  footer: {
+    position: 'absolute',
+    bottom: 24,
+  },
+  iconDenied: {
+    width: 60,
+    height: 60,
+    borderRadius: '50%',
+    border: '2px solid var(--danger)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: '1.5rem',
+    color: 'var(--danger)',
+    marginBottom: 16,
+  },
+  errorDetail: {
+    fontSize: '0.7rem',
+    color: 'var(--danger)',
+    opacity: 0.7,
+    marginTop: 4,
+  },
+  spinner: {
+    width: 40,
+    height: 40,
+    border: '2px solid rgba(0, 255, 136, 0.15)',
+    borderTopColor: 'var(--neon-green)',
+    borderRadius: '50%',
+    animation: 'spin 0.8s linear infinite',
+  },
+};
+
+// Inject spinner keyframes
+if (typeof document !== 'undefined') {
+  const style = document.createElement('style');
+  style.textContent = `@keyframes spin { to { transform: rotate(360deg); } }`;
+  document.head.appendChild(style);
+}
