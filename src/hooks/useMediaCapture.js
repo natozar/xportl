@@ -14,30 +14,43 @@ export function useMediaCapture() {
   const chunksRef = useRef([]);
 
   // ── Capture photo + NSFW scan ──
-  // We intentionally do NOT call getUserMedia here: AR.js already holds the
-  // camera and a second consumer breaks on iOS Safari and on Androids that
-  // return NotReadableError when two streams target the same device.
-  // Instead we grab the frame straight off AR.js's own <video> element,
-  // which is always mounted on the live scene.
+  // Preferred path: grab the frame straight off AR.js's own <video> element.
+  // Avoids a second getUserMedia that would collide with AR.js on iOS Safari
+  // and on Androids that throw NotReadableError for a second consumer.
+  // Fallback path: if AR.js never mounted its video (aframe-ar failed to
+  // load, user is not in AR mode, etc.) we open a one-shot getUserMedia,
+  // draw one frame, and close it.
   const capturePhoto = useCallback(async () => {
     setModerationError(null);
 
     try {
+      const canvas = document.createElement('canvas');
+
       const arVideo =
         document.querySelector('a-scene video') ||
         document.querySelector('#arjs-video') ||
         document.querySelector('video[autoplay][playsinline]');
 
-      if (!arVideo || !arVideo.videoWidth) {
-        console.error('[XPortl] AR video element not ready for capture');
-        setModerationError('Camera ainda inicializando. Tente novamente em 2 segundos.');
-        return null;
+      if (arVideo && arVideo.videoWidth) {
+        canvas.width = arVideo.videoWidth;
+        canvas.height = arVideo.videoHeight;
+        canvas.getContext('2d').drawImage(arVideo, 0, 0);
+      } else {
+        // Fallback: spin up our own stream since AR.js didn't
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 960 } },
+        });
+        const video = document.createElement('video');
+        video.srcObject = stream;
+        video.setAttribute('playsinline', '');
+        video.muted = true;
+        try { await video.play(); } catch (_) { /* iOS may need a second */ }
+        await new Promise((r) => setTimeout(r, 300));
+        canvas.width = video.videoWidth || 1280;
+        canvas.height = video.videoHeight || 960;
+        canvas.getContext('2d').drawImage(video, 0, 0);
+        stream.getTracks().forEach((t) => t.stop());
       }
-
-      const canvas = document.createElement('canvas');
-      canvas.width = arVideo.videoWidth;
-      canvas.height = arVideo.videoHeight;
-      canvas.getContext('2d').drawImage(arVideo, 0, 0);
 
       const preview = canvas.toDataURL('image/webp', 0.5);
 

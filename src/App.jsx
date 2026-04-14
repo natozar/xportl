@@ -32,6 +32,20 @@ import { validateContent, checkRateLimit, checkRestrictedZone, logAccess } from 
 const SCAN_INTERVAL = 30_000;
 const SCAN_RADIUS = 50;
 
+// Offset planted capsules ~6m from the user in a random bearing so the AR
+// entity doesn't render at distance zero (invisible, colocated with the
+// camera). Multiple capsules planted at the same spot spread in a small
+// circle around the user.
+const PLANT_OFFSET_METERS = 6;
+function offsetCoord(lat, lng) {
+  const bearing = Math.random() * 2 * Math.PI;
+  const dLat = (PLANT_OFFSET_METERS * Math.cos(bearing)) / 111320;
+  const dLng =
+    (PLANT_OFFSET_METERS * Math.sin(bearing)) /
+    (111320 * Math.cos((lat * Math.PI) / 180));
+  return { lat: lat + dLat, lng: lng + dLng };
+}
+
 function isCapsuleVisible(c) {
   return !c.moderation_status || c.moderation_status === 'active';
 }
@@ -315,9 +329,10 @@ export default function App() {
         mediaTypeField = mediaType;
       }
 
+      const plant = offsetCoord(geo.lat, geo.lng);
       await createCapsule({
-        lat: geo.lat,
-        lng: geo.lng,
+        lat: plant.lat,
+        lng: plant.lng,
         altitude: geo.altitude,
         content: { type: 'text', body: 'Estive aqui!' },
         visibility_layer: visibilityLayer || 'public',
