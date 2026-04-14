@@ -326,9 +326,9 @@ const st = {
 };
 
 // Inject destroy animation
-if (typeof document !== 'undefined' && !document.getElementById('xplore-destroy-keyframes')) {
+if (typeof document !== 'undefined' && !document.getElementById('xportl-destroy-keyframes')) {
   const style = document.createElement('style');
-  style.id = 'xplore-destroy-keyframes';
+  style.id = 'xportl-destroy-keyframes';
   style.textContent = `@keyframes destroy-fill { from { width: 0; } to { width: 100%; } }`;
   document.head.appendChild(style);
 }

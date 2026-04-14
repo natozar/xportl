@@ -1,12 +1,12 @@
 /**
- * Custom A-Frame components for Xplore.
+ * Custom A-Frame components for XPortl.
  * Must be called ONCE before any <a-scene> renders.
  */
 
-export function registerXploreComponents() {
+export function registerXPortlComponents() {
   const AFRAME = window.AFRAME;
   if (!AFRAME) {
-    console.warn('[Xplore] A-Frame not loaded');
+    console.warn('[XPortl] A-Frame not loaded');
     return;
   }
 
@@ -24,7 +24,7 @@ export function registerXploreComponents() {
           navigator.vibrate(this.data.locked ? [200, 100, 200] : [100, 50, 100]);
         }
         window.dispatchEvent(
-          new CustomEvent('xplore:capsule-click', {
+          new CustomEvent('xportl:capsule-click', {
             detail: { id: this.data.capsuleId },
           })
         );
@@ -41,7 +41,7 @@ export function registerXploreComponents() {
       this.el.addEventListener('click', () => {
         if (navigator.vibrate) navigator.vibrate([80, 40, 80, 40, 80]);
         window.dispatchEvent(
-          new CustomEvent('xplore:vortex-click', {
+          new CustomEvent('xportl:vortex-click', {
             detail: { id: this.data.vortexId },
           })
         );

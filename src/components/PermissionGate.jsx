@@ -38,7 +38,7 @@ export default function PermissionGate({ geo, cam, onComplete }) {
             Acesso Negado
           </h2>
           <p style={styles.subtitle}>
-            O Xplore precisa da sua <strong>camera</strong> e <strong>localização</strong> para
+            O XPortl precisa da sua <strong>camera</strong> e <strong>localização</strong> para
             revelar os misterios escondidos ao seu redor.
           </p>
           {geo.denied && (
@@ -82,13 +82,13 @@ export default function PermissionGate({ geo, cam, onComplete }) {
         <div style={styles.logo}>
           <span className="neon-green" style={{ fontSize: '3rem', fontWeight: 700 }}>X</span>
         </div>
-        <h1 style={styles.title}>XPLORE</h1>
-        <p style={styles.tagline}>Camada digital invisivel</p>
+        <h1 style={styles.title}>XPORTL</h1>
+        <p style={styles.tagline}>Capsulas do tempo em AR</p>
         <p style={styles.subtitle}>
-          Descubra misterios escondidos<br />no mundo ao seu redor.
+          Abra portais digitais escondidos<br />no mundo ao seu redor.
         </p>
         <button className="btn-primary" style={{ marginTop: 32 }} onClick={handleEnter}>
-          Ativar Visor
+          Abrir Portal
         </button>
         <p style={styles.permNote}>
           Sera necessario acesso a camera e GPS
@@ -96,7 +96,7 @@ export default function PermissionGate({ geo, cam, onComplete }) {
       </div>
       <div style={styles.footer}>
         <span style={{ color: 'var(--text-muted)', fontSize: '0.6rem', letterSpacing: '0.15em' }}>
-          v0.1.0 // MVP PHASE 1
+          v1.0.0 // XPORTL
         </span>
       </div>
     </div>
@@ -111,7 +111,7 @@ const styles = {
     flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
-    background: 'var(--bg-void)',
+    background: 'radial-gradient(ellipse at 50% 80%, rgba(180,74,255,0.06) 0%, var(--bg-void) 60%)',
     padding: 32,
     position: 'relative',
   },
@@ -125,11 +125,11 @@ const styles = {
     width: 80,
     height: 80,
     borderRadius: '50%',
-    border: '2px solid var(--neon-green)',
+    border: '2px solid var(--neon-cyan)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    boxShadow: 'var(--glow-green)',
+    boxShadow: '0 0 25px rgba(0, 240, 255, 0.3), inset 0 0 15px rgba(180, 74, 255, 0.1)',
   },
   title: {
     fontSize: '1.8rem',
@@ -141,10 +141,10 @@ const styles = {
   tagline: {
     fontSize: '0.7rem',
     letterSpacing: '0.25em',
-    color: 'var(--neon-green)',
+    color: 'var(--neon-cyan)',
     textTransform: 'uppercase',
     marginTop: 4,
-    textShadow: 'var(--glow-green)',
+    textShadow: 'var(--glow-cyan)',
   },
   subtitle: {
     fontSize: '0.85rem',

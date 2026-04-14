@@ -38,7 +38,7 @@ export function useMediaCapture() {
       setMedia({ blob, type: 'image', preview });
       return { blob, type: 'image', preview };
     } catch (err) {
-      console.error('[Xplore] Photo capture failed:', err);
+      console.error('[XPortl] Photo capture failed:', err);
       return null;
     }
   }, []);
@@ -76,7 +76,7 @@ export function useMediaCapture() {
         }
       }, 30000);
     } catch (err) {
-      console.error('[Xplore] Audio recording failed:', err);
+      console.error('[XPortl] Audio recording failed:', err);
     }
   }, []);
 

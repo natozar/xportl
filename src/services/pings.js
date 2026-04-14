@@ -34,7 +34,7 @@ export async function createPing({ lat, lng, emoji }) {
     .single();
 
   if (error) {
-    console.error('[Xplore] Ping insert failed:', error.message);
+    console.error('[XPortl] Ping insert failed:', error.message);
     throw error;
   }
 
@@ -55,7 +55,7 @@ export async function deletePing(pingId) {
     .delete()
     .eq('id', pingId);
 
-  if (error) console.error('[Xplore] Ping delete failed:', error.message);
+  if (error) console.error('[XPortl] Ping delete failed:', error.message);
 }
 
 /**

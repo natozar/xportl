@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { registerXploreComponents } from '../aframe/registerComponents';
+import { registerXPortlComponents } from '../aframe/registerComponents';
 import { isCapsuleLocked } from '../services/capsules';
 import { isPing, PING_LIFETIME } from '../services/pings';
 import { clusterCapsules } from '../services/clustering';
@@ -24,7 +24,7 @@ export default function ARScene({ capsules, pings, onCapsuleClick, onVortexClick
     if (initializedRef.current || !sceneContainerRef.current) return;
     initializedRef.current = true;
 
-    registerXploreComponents();
+    registerXPortlComponents();
 
     const scene = document.createElement('a-scene');
     scene.setAttribute('vr-mode-ui', 'enabled: false');
@@ -179,11 +179,11 @@ export default function ARScene({ capsules, pings, onCapsuleClick, onVortexClick
       if (onVortexClick) onVortexClick(e.detail.id);
     };
 
-    window.addEventListener('xplore:capsule-click', capsuleHandler);
-    window.addEventListener('xplore:vortex-click', vortexHandler);
+    window.addEventListener('xportl:capsule-click', capsuleHandler);
+    window.addEventListener('xportl:vortex-click', vortexHandler);
     return () => {
-      window.removeEventListener('xplore:capsule-click', capsuleHandler);
-      window.removeEventListener('xplore:vortex-click', vortexHandler);
+      window.removeEventListener('xportl:capsule-click', capsuleHandler);
+      window.removeEventListener('xportl:vortex-click', vortexHandler);
     };
   }, [capsules, onCapsuleClick, onVortexClick]);
 

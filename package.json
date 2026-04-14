@@ -1,8 +1,8 @@
 {
-  "name": "xplore",
+  "name": "xportl",
   "private": true,
-  "version": "0.1.0",
-  "description": "Camada Digital Invisivel sobre o mundo real - Location-based AR PWA",
+  "version": "1.0.0",
+  "description": "XPortl - A Realidade Aumentada de Capsulas do Tempo",
   "type": "module",
   "scripts": {
     "dev": "vite",

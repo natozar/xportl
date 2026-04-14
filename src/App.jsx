@@ -54,7 +54,7 @@ export default function App() {
         setSupabaseOk(true);
       } catch (err) {
         if (cancelled) return;
-        console.error('[Xplore] Scan failed:', err);
+        console.error('[XPortl] Scan failed:', err);
         setSupabaseOk(false);
       }
     };
@@ -96,7 +96,7 @@ export default function App() {
       setNearbyCapsules(results);
       setLastScan(new Date().toLocaleTimeString('pt-BR'));
     } catch (err) {
-      console.error('[Xplore] Failed to create capsule:', err);
+      console.error('[XPortl] Failed to create capsule:', err);
     } finally {
       setSaving(false);
     }
@@ -117,7 +117,7 @@ export default function App() {
         setActivePings((prev) => prev.filter((p) => p.id !== ping.id));
       }, 15500);
     } catch (err) {
-      console.error('[Xplore] Ping failed:', err);
+      console.error('[XPortl] Ping failed:', err);
     }
   }, [geo.lat, geo.lng]);
 

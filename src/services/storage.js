@@ -20,7 +20,7 @@ export async function uploadMedia(file, mediaType) {
     });
 
   if (error) {
-    console.error('[Xplore] Upload failed:', error.message);
+    console.error('[XPortl] Upload failed:', error.message);
     throw error;
   }
 
@@ -45,5 +45,5 @@ export async function deleteMedia(mediaUrl) {
 
   const path = mediaUrl.slice(idx + marker.length);
   const { error } = await supabase.storage.from(BUCKET).remove([path]);
-  if (error) console.error('[Xplore] Delete media failed:', error.message);
+  if (error) console.error('[XPortl] Delete media failed:', error.message);
 }

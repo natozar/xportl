@@ -1,5 +1,5 @@
 -- ============================================
--- XPLORE - Database Schema (Supabase/PostgreSQL)
+-- XPORTL - Database Schema (Supabase/PostgreSQL)
 -- Phase 1 MVP
 -- ============================================
 

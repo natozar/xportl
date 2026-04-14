@@ -1,21 +1,24 @@
 /* ========================================
-   XPLORE — Cyberpunk Clean / Mysterious
-   Vision OS × Cyberpunk 2077
+   XPORTL — Portal Hacker / Neon Urgency
+   Dark Violet × Cyan × Incandescent Orange
    ======================================== */
 
 :root {
-  --bg-void: #0a0a0f;
-  --bg-surface: #12121a;
-  --bg-glass: rgba(10, 10, 15, 0.6);
-  --neon-green: #00ff88;
+  --bg-void: #0d0a1a;
+  --bg-surface: #13102a;
+  --bg-glass: rgba(13, 10, 26, 0.65);
+  --neon-green: #00f0ff;
   --neon-purple: #b44aff;
-  --neon-cyan: #00e5ff;
+  --neon-cyan: #00f0ff;
+  --neon-orange: #ff6b2b;
   --text-primary: #e8e8f0;
   --text-muted: #6b6b80;
   --danger: #ff3366;
   --radius: 14px;
-  --glow-green: 0 0 20px rgba(0, 255, 136, 0.3);
+  --glow-green: 0 0 20px rgba(0, 240, 255, 0.3);
+  --glow-cyan: 0 0 20px rgba(0, 240, 255, 0.3);
   --glow-purple: 0 0 20px rgba(180, 74, 255, 0.3);
+  --glow-orange: 0 0 20px rgba(255, 107, 43, 0.3);
 }
 
 * {

@@ -68,7 +68,7 @@ export async function createCapsule({ lat, lng, altitude, content, visibility_la
     .single();
 
   if (error) {
-    console.error('[Xplore] Insert failed:', error.message);
+    console.error('[XPortl] Insert failed:', error.message);
     throw error;
   }
 
@@ -86,7 +86,7 @@ export async function consumeView(capsuleId) {
   });
 
   if (error) {
-    console.error('[Xplore] consume_view failed:', error.message);
+    console.error('[XPortl] consume_view failed:', error.message);
     // Fallback: direct update
     const { data: row } = await supabase
       .from('capsules')
@@ -159,7 +159,7 @@ export async function getNearbyCapsules(lat, lng, radiusMeters = 50) {
     }));
   }
 
-  console.warn('[Xplore] RPC fallback:', rpcError?.message);
+  console.warn('[XPortl] RPC fallback:', rpcError?.message);
 
   const degreeRadius = radiusMeters / 111000;
   const { data: rawData, error: selectError } = await supabase

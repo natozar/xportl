@@ -1,5 +1,5 @@
 -- ============================================
--- XPLORE - Migration 002: Ghost Layer + Media
+-- XPORTL - Migration 002: Ghost Layer + Media
 -- Run this in Supabase SQL Editor
 -- ============================================
 
