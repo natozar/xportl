@@ -8,7 +8,7 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       injectRegister: false, // we call registerSW() explicitly in main.jsx
-      devOptions: { enabled: true, type: 'module' },
+      devOptions: { enabled: false },
       includeAssets: ['favicon.svg', 'icons/*.png'],
       manifest: {
         id: '/',
@@ -43,19 +43,13 @@ export default defineConfig({
             purpose: 'maskable',
           },
         ],
-        screenshots: [
-          {
-            src: '/icons/icon-512.png',
-            sizes: '512x512',
-            type: 'image/png',
-            form_factor: 'narrow',
-            label: 'XPortl AR View',
-          },
-        ],
       },
       workbox: {
+        cleanupOutdatedCaches: true,
+        skipWaiting: true,
+        clientsClaim: true,
         globPatterns: ['**/*.{css,html,svg,png,woff2}'],
-        globIgnores: ['**/group1-shard*', '**/tfjs*'],
+        globIgnores: ['**/group1-shard*', '**/tfjs*', '**/nsfw-ai*'],
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024, // 5MB
         navigateFallback: '/index.html',
         runtimeCaching: [
@@ -80,6 +74,12 @@ export default defineConfig({
     }),
   ],
   build: {
+    // Strip the NSFW/TF.js chunk from the entry's modulepreload graph.
+    // It's only needed when the user actually captures a photo, not at boot.
+    modulePreload: {
+      resolveDependencies: (_filename, deps) =>
+        deps.filter((d) => !d.includes('nsfw-ai')),
+    },
     rollupOptions: {
       output: {
         manualChunks(id) {

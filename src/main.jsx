@@ -4,6 +4,20 @@ import { registerSW } from 'virtual:pwa-register';
 import App from './App';
 import './styles/global.css';
 
+// Kill-switch: legacy SWs (from earlier dev builds with devOptions.enabled) shipped
+// a `registerSW.js` helper and cached stale bundle hashes. Unregister them before
+// the new SW takes over so users don't get stranded on 404ing asset URLs.
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.getRegistrations().then((regs) => {
+    for (const reg of regs) {
+      const url = reg.active?.scriptURL || reg.installing?.scriptURL || '';
+      if (url.includes('registerSW.js')) {
+        reg.unregister();
+      }
+    }
+  }).catch(() => {});
+}
+
 registerSW({ immediate: true });
 
 ReactDOM.createRoot(document.getElementById('root')).render(
