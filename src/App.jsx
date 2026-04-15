@@ -42,7 +42,7 @@ import Leaderboard from './components/Leaderboard';
 // websocket drops or a change arrives while unfocused, the next poll catches
 // it. 30s is plenty when realtime is doing the heavy lifting.
 const SCAN_INTERVAL = 30_000;
-const SCAN_RADIUS = 50;
+const SCAN_RADIUS = 500; // 500m for testing, reduce to 50-100m for production
 
 // ── Smart capsule placement ──
 // Uses device compass to place the capsule WHERE THE USER IS LOOKING,
