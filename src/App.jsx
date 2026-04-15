@@ -120,7 +120,7 @@ export default function App() {
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [showCreatePost, setShowCreatePost] = useState(false);
   const [showPortalAnimation, setShowPortalAnimation] = useState(false);
-  const scanVersion = useRef(0);
+  const [scanVersion, setScanVersion] = useState(0);
 
   // ── Auth listener ──
   useEffect(() => {
@@ -304,7 +304,7 @@ export default function App() {
     scan();
     const interval = setInterval(scan, SCAN_INTERVAL);
     return () => { cancelled = true; clearInterval(interval); };
-  }, [ready, geo.lat, geo.lng, scanVersion.current]);
+  }, [ready, geo.lat, geo.lng, scanVersion]);
 
   // ── Shared capsule link detection ──
   useEffect(() => {
@@ -457,7 +457,7 @@ export default function App() {
         console.warn('[XPortl] XP award failed (capsule was saved):', xpErr);
       }
 
-      scanVersion.current += 1;
+      setScanVersion((v) => v + 1);
       const results = await getNearbyCapsules(geo.lat, geo.lng, SCAN_RADIUS);
       setNearbyCapsules(results.filter((c) => !c.moderation_status || c.moderation_status === 'active'));
       setLastScan(new Date().toLocaleTimeString('pt-BR'));

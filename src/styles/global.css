@@ -106,18 +106,18 @@ a-scene canvas {
   z-index: 0 !important;
 }
 
-/* Camera video feed: cover viewport, centered, no stretch */
-a-scene video {
+/* Camera video feed: fill viewport, high quality, no stretch */
+a-scene video,
+#arjs-video {
   position: fixed !important;
-  top: 50% !important;
-  left: 50% !important;
-  transform: translate(-50%, -50%) !important;
-  min-width: 100% !important;
-  min-height: 100% !important;
-  width: auto !important;
-  height: auto !important;
+  inset: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  height: 100dvh !important;
   object-fit: cover !important;
   z-index: 0 !important;
+  image-rendering: auto !important;
+  transform: none !important;
 }
 
 /* A-Frame injects wrapper divs that can steal clicks — neutralize them */
