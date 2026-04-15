@@ -23,7 +23,7 @@ export default function ProfilePage({ session, profile, onOpenSettings, onRefres
       await updateDisplayName(user.id, name.trim());
       setEditingName(false);
       if (onRefreshProfile) onRefreshProfile();
-    } catch (_) {}
+    } catch (_e) { /* save failed */ }
     setSaving(false);
   };
 

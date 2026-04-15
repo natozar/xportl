@@ -127,7 +127,7 @@ export default function CapsuleMap() {
 
     return () => {
       cancelled = true;
-      try { mapRef.current?.remove(); mapRef.current = null; } catch (_) {}
+      try { mapRef.current?.remove(); mapRef.current = null; } catch (_e) { /* cleanup */ }
     };
   }, [loading, capsules]);
 

@@ -7,21 +7,19 @@ export default function CapsuleModal({ capsule, onClose, onSelfDestruct, onRepor
   const audioRef = useRef(null);
   const consumedRef = useRef(false);
 
+  const locked = capsule ? isCapsuleLocked(capsule) : false;
+  const ghost = capsule ? isGhostCapsule(capsule) : false;
+  const timeLeft = capsule ? getTimeRemaining(capsule) : null;
+  const content = capsule?.content || {};
+  const body = content.body || content.emoji || '';
+  const accent = locked ? '#b44aff' : '#00f0ff';
+
   // Reset state when capsule changes
   useEffect(() => {
     setViewsLeft(null);
     setAudioPlaying(false);
     consumedRef.current = false;
   }, [capsule?.id]);
-
-  if (!capsule) return null;
-
-  const locked = isCapsuleLocked(capsule);
-  const ghost = isGhostCapsule(capsule);
-  const timeLeft = getTimeRemaining(capsule);
-  const content = capsule.content || {};
-  const body = content.body || content.emoji || '';
-  const accent = locked ? '#b44aff' : '#00f0ff';
 
   // Consume view
   useEffect(() => {
@@ -33,6 +31,9 @@ export default function CapsuleModal({ capsule, onClose, onSelfDestruct, onRepor
     }
     haptic([60, 30, 60]);
   }, [capsule?.id, locked]);
+
+  // Early return AFTER all hooks
+  if (!capsule) return null;
 
   const close = () => {
     if (viewsLeft !== null && viewsLeft <= 0) {

@@ -102,7 +102,7 @@ export default function CreatePost({ onPost, onClose, saving }) {
         setTimeout(() => { setNsfwBlocked(false); setPhase('camera'); }, 3000);
         return;
       }
-    } catch (_) {}
+    } catch (_e) { /* nsfw check failed, allow */ }
 
     const blob = await new Promise(r => canvas.toBlob(r, 'image/webp', 0.88));
     setPhotoUrl(dataUrl);

@@ -31,7 +31,7 @@ export function decodeShareToken() {
     const token = hash.split('capsule=')[1];
     const payload = JSON.parse(atob(token));
     if (payload.id && payload.lat && payload.lng) return payload;
-  } catch (_) {}
+  } catch (_e) { /* ignore */ }
 
   return null;
 }
