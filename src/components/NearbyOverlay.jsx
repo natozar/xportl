@@ -19,9 +19,9 @@ export default function NearbyOverlay({ capsules, userLat, userLng, onSelect }) 
     };
   }, []);
 
-  // Animation tick (30fps for smooth portal animation)
+  // Slow animation tick (10fps — subtle, not distracting)
   useEffect(() => {
-    const interval = setInterval(() => setTick(Date.now()), 33);
+    const interval = setInterval(() => setTick(Date.now()), 100);
     return () => clearInterval(interval);
   }, []);
 
@@ -49,16 +49,16 @@ export default function NearbyOverlay({ capsules, userLat, userLng, onSelect }) 
 
         // Visual properties based on distance
         const closeness = Math.max(0, 1 - dist / 500);
-        const size = 56 + closeness * 30; // 56-86px
+        const size = 40 + closeness * 16; // 40-56px (smaller, cleaner)
         const baseColor = locked ? [180, 74, 255] : ghost ? [180, 74, 255] : [0, 240, 255];
         const color = `rgb(${baseColor.join(',')})`;
-        const glow = `rgba(${baseColor.join(',')}, ${0.3 + closeness * 0.3})`;
+        const glow = `rgba(${baseColor.join(',')}, ${0.2 + closeness * 0.2})`;
 
-        // Animation phase (unique per capsule)
-        const phase = (tick / 1000 + idx * 1.7) % (Math.PI * 2);
-        const floatY = Math.sin(phase * 2) * 4;
-        const ringRotation = (tick / 50 + idx * 40) % 360;
-        const pulseScale = 1 + Math.sin(phase * 3) * 0.08;
+        // Subtle animation (slow, steady — easy to tap)
+        const phase = (tick / 3000 + idx * 1.7) % (Math.PI * 2);
+        const floatY = Math.sin(phase) * 1.5; // minimal float
+        const ringRotation = (tick / 200 + idx * 40) % 360; // slow spin
+        const pulseScale = 1 + Math.sin(phase * 2) * 0.03; // barely breathing
 
         return (
           <button
@@ -164,7 +164,7 @@ const s = {
     pointerEvents: 'auto',
     WebkitTapHighlightColor: 'transparent',
     touchAction: 'manipulation',
-    transition: 'left 0.15s ease-out',
+    transition: 'left 0.3s ease-out',
   },
   outerGlow: {
     position: 'absolute',

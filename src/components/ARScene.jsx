@@ -63,7 +63,8 @@ export default function ARScene({ capsules, pings, onCapsuleClick, onVortexClick
 
     const scene = document.createElement('a-scene');
     scene.setAttribute('vr-mode-ui', 'enabled: false');
-    scene.setAttribute('renderer', 'antialias: true; alpha: true; logarithmicDepthBuffer: true');
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    scene.setAttribute('renderer', `antialias: true; alpha: true; logarithmicDepthBuffer: true; pixelRatio: ${dpr}`);
     // Request HD camera. AR.js will use getUserMedia with these constraints.
     // On portrait phones, swap width/height so the camera matches orientation.
     const portrait = window.innerHeight > window.innerWidth;
