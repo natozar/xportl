@@ -79,9 +79,9 @@ export default function MapView({ lat, lng, capsules, onSelectCapsule }) {
   const userMarkerRef = useRef(null);
   const [loading, setLoading] = useState(true);
 
-  // Initialize map (wait for GPS)
+  // Initialize map immediately (don't wait for GPS — will recenter when GPS arrives)
   useEffect(() => {
-    if (!mapContainerRef.current || mapRef.current || lat === null || lng === null) return;
+    if (!mapContainerRef.current || mapRef.current) return;
 
     let cancelled = false;
 
@@ -90,8 +90,8 @@ export default function MapView({ lat, lng, capsules, onSelectCapsule }) {
       if (cancelled || mapRef.current) return;
 
       const map = leaflet.map(mapContainerRef.current, {
-        center: [lat, lng],
-        zoom: 17,
+        center: [lat || -21.17, lng || -47.81],  // fallback to Ribeirao Preto
+        zoom: lat ? 17 : 12,
         zoomControl: false,
         attributionControl: false,
       });
@@ -125,7 +125,8 @@ export default function MapView({ lat, lng, capsules, onSelectCapsule }) {
         mapRef.current = null;
       }
     };
-  }, [lat, lng]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Update user position
   useEffect(() => {

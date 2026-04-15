@@ -282,18 +282,32 @@ export default function App() {
     if (permissionsGranted && legalGatesCleared && !ready) markReady();
   }, [permissionsGranted, legalGatesCleared, ready]);
 
-  // ── Polling (safety net) ──
+  // ── Polling ──
   useEffect(() => {
-    if (!ready || geo.lat === null || geo.lng === null) return;
+    if (!ready) return;
     let cancelled = false;
 
     const scan = async () => {
       try {
-        const results = await getNearbyCapsules(geo.lat, geo.lng, SCAN_RADIUS);
+        let results;
+        if (geo.lat !== null && geo.lng !== null) {
+          results = await getNearbyCapsules(geo.lat, geo.lng, SCAN_RADIUS);
+        } else {
+          // GPS not ready yet — fetch recent capsules without distance filter
+          console.log('[XPortl] GPS not ready, fetching recent capsules...');
+          const { data } = await supabase
+            .from('capsules')
+            .select('*')
+            .eq('moderation_status', 'active')
+            .order('created_at', { ascending: false })
+            .limit(50);
+          results = (data || []).map((c) => ({ ...c, distance_meters: 0 }));
+        }
         if (cancelled) return;
         setNearbyCapsules(results.filter(isCapsuleVisible));
         setLastScan(new Date().toLocaleTimeString('pt-BR'));
         setSupabaseOk(true);
+        console.log(`[XPortl] Scan: ${results.length} capsules found`);
       } catch (err) {
         if (cancelled) return;
         console.error('[XPortl] Scan failed:', err);
