@@ -100,7 +100,7 @@ const s = {
     position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)',
     backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
-    zIndex: 100, padding: 16, pointerEvents: 'auto',
+    zIndex: 10000, padding: 16, pointerEvents: 'auto',
   },
   modal: {
     background: 'rgba(12,12,18,0.92)', backdropFilter: 'blur(40px)',
