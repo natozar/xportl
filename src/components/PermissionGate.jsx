@@ -1,8 +1,19 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 
 export default function PermissionGate({ geo, cam, onComplete }) {
-  const [step, setStep] = useState('welcome'); // welcome | requesting | denied
+  const [step, setStep] = useState('welcome');
   const [statusText, setStatusText] = useState('');
+  const completedRef = useRef(false);
+
+  // As soon as both permissions are granted, call onComplete ONCE
+  useEffect(() => {
+    if (geo.granted && cam.granted && !completedRef.current) {
+      completedRef.current = true;
+      // Small delay so the user sees "ABRINDO PORTAL..." feedback
+      const t = setTimeout(() => onComplete(), 400);
+      return () => clearTimeout(t);
+    }
+  }, [geo.granted, cam.granted, onComplete]);
 
   const handleEnter = async () => {
     setStep('requesting');

@@ -554,7 +554,10 @@ export default function App() {
   if (showDisclaimer) return <LocationDisclaimer onAccept={handleAcceptDisclaimer} />;
 
   // 6. Camera/GPS permissions
-  if (!ready) return <PermissionGate geo={geo} cam={cam} onComplete={() => setReady(true)} />;
+  if (!ready) return <PermissionGate geo={geo} cam={cam} onComplete={() => {
+    console.log('[XPortl Gate] onComplete called from PermissionGate');
+    setReady(true);
+  }} />;
 
   // ── Tab handler (Create tab opens the creation panel via explore view) ──
   const handleTabChange = (tab) => {
