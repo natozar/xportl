@@ -113,7 +113,7 @@ const s = {
     top: 'calc(50px + env(safe-area-inset-top, 0px))',
     left: 0, right: 0,
     height: '40%',
-    zIndex: 9998,
+    zIndex: 10000,
     pointerEvents: 'none',
     overflow: 'hidden',
   },

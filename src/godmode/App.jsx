@@ -140,6 +140,9 @@ export default function App() {
 
   return (
     <div style={s.layout}>
+      {/* Fixed back button — always visible, even on mobile */}
+      <a href="/app" style={s.fixedBack}>← APP</a>
+
       <aside style={s.sidebar}>
         <div style={s.brand}><span style={s.brandDot} /> godmode</div>
         <div style={s.sessionInfo}>
@@ -194,6 +197,13 @@ const s = {
   navLink: { padding: '10px 12px', color: '#8888a0', textDecoration: 'none', fontSize: '0.75rem', borderRadius: 4, transition: 'all 0.15s' },
   navLinkActive: { background: '#12122a', color: '#e8e8f0' },
   sidebarFooter: { display: 'flex', flexDirection: 'column', gap: 6, paddingTop: 12, borderTop: '1px solid #1a1a30' },
+  fixedBack: {
+    position: 'fixed', top: 10, right: 16, zIndex: 9999,
+    padding: '8px 16px', borderRadius: 8,
+    background: '#00e5ff', color: '#05050f',
+    textDecoration: 'none', fontSize: '0.72rem', fontWeight: 700,
+    letterSpacing: '0.1em', boxShadow: '0 0 12px rgba(0,229,255,0.3)',
+  },
   backLink: { padding: '8px 12px', color: '#00e5ff', textDecoration: 'none', fontSize: '0.7rem', borderRadius: 4 },
   logoutBtn: { padding: '10px 12px', background: 'transparent', color: '#55556a', border: '1px solid #1a1a30', borderRadius: 4, cursor: 'pointer', fontSize: '0.7rem', fontFamily: 'inherit', textAlign: 'left' },
   main: { flex: 1, padding: 32, overflow: 'auto' },
