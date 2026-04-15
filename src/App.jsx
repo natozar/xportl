@@ -13,6 +13,7 @@ import VibePing from './components/VibePing';
 import ReportModal from './components/ReportModal';
 import InstallPrompt from './components/InstallPrompt';
 import BottomNav from './components/BottomNav';
+import NearbyOverlay from './components/NearbyOverlay';
 import MapView from './components/MapView';
 import IndoorScene from './components/IndoorScene';
 import ProfilePage from './components/ProfilePage';
@@ -59,10 +60,10 @@ if (typeof window !== 'undefined') {
 }
 
 function smartPlaceCoord(lat, lng, accuracy) {
-  // Distance: based on GPS accuracy, clamped between 2m and 5m
-  // High accuracy (±3m) → place at 2m
-  // Low accuracy (±20m) → place at 5m
-  const dist = Math.max(2, Math.min(5, (accuracy || 10) * 0.3));
+  // Minimal offset: 1m in the direction the user is looking.
+  // Just enough so AR.js doesn't render the entity at distance zero
+  // (which makes it invisible/behind the camera).
+  const dist = 1;
 
   // Direction: use compass heading (where user is pointing the phone)
   // Fall back to random if compass not available
@@ -408,6 +409,9 @@ export default function App() {
         mediaTypeField = mediaType;
       }
 
+      // Place capsule at user's exact GPS coordinates.
+      // The NearbyOverlay compass system handles visualization.
+      // Slight offset (1m in look direction) prevents exact-zero-distance rendering.
       const plant = smartPlaceCoord(geo.lat, geo.lng, geo.accuracy);
       await createCapsule({
         lat: plant.lat,
@@ -614,6 +618,14 @@ export default function App() {
           {pwa.canInstall && (
             <InstallPrompt isIos={pwa.isIos} isAndroid={pwa.isAndroid} onInstall={pwa.install} onDismiss={pwa.dismiss} />
           )}
+
+          {/* Compass-based directional markers (always visible, GPS-independent) */}
+          <NearbyOverlay
+            capsules={nearbyCapsules}
+            userLat={geo.lat}
+            userLng={geo.lng}
+            onSelect={handleCapsuleClick}
+          />
 
           <div style={styles.overlay}>
             <Radar lat={geo.lat} lng={geo.lng} altitude={geo.altitude} nearbyCount={nearbyCapsules.length} />
