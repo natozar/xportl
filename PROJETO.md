@@ -1,6 +1,6 @@
 # XPORTL — Contexto Completo do Projeto
 
-**Atualizado:** 15 de abril de 2026
+**Atualizado:** 15 de abril de 2026 (madrugada)
 **Repo:** https://github.com/natozar/xportl
 **Deploy:** https://xportl.vercel.app
 **Godmode:** https://xportl.vercel.app/godmode
@@ -149,6 +149,10 @@ src/
 | feature_flags | Kill switches + config runtime (6 flags default) | migration_004 |
 | xp_events | Ledger de XP (append-only) | migration_010 |
 
+### RLS Policy especial
+- **"Admins can read all capsules"** (migration_011): admins veem todas as
+  capsulas independente de visibility_layer. Necessario para godmode funcionar.
+
 ### Storage Bucket
 - **capsule-media** (Public, 10MB limit)
 - Policies: INSERT/SELECT/DELETE para bucket_id = 'capsule-media'
@@ -230,12 +234,16 @@ src/
 ### Admin (Godmode)
 - [x] Overview: metricas reais (users, capsulas, erros, denuncias)
 - [x] Grafico SVG: erros por hora (24h) + top errors por tipo
-- [x] Errors page: diagnostico IA + prompts copiáveis para Claude Code
+- [x] Publicacoes: grid visual de TODAS as capsulas (foto, texto, GPS, flags, delete)
+- [x] Mapa capsulas: Leaflet dark tiles com todos os pins
+- [x] Errors page: diagnostico IA + prompts copiaveis para Claude Code
 - [x] Feature flags editor
 - [x] Kill switch (IA desligada por padrao)
 - [x] Audit log (append-only, imutavel)
 - [x] Session separada do app (godmode nunca faz signOut)
 - [x] Idle timeout 15min (lock local, sem logout)
+- [x] Botao fixo "← APP" para voltar ao app
+- [x] RLS policy admin: admins veem TODAS as capsulas (migration_011)
 
 ### PWA
 - [x] Service Worker (Workbox, auto-update, skip-waiting)
@@ -297,16 +305,20 @@ query retornava 0 rows.
 Ao adicionar features com recursos externos, atualizar TODOS os CSPs.
 Admins precisam de policies de SELECT separadas para ver tudo.
 
-### Bug: Clicar na capsula nao abre nada (modal invisivel)
+### Bug: Clicar na capsula nao abre nada (modal invisivel) — MULTIPLOS FIXES
 **Sintoma:** Capsula aparecia no NearbyOverlay, usuario tocava, nada acontecia.
-**Causa:** CapsuleModal tinha z-index:100. O overlay de UI (NearbyOverlay,
-Radar, FAB) tinha z-index:9999. O modal renderizava mas ficava ATRAS de tudo.
-**Fix:** Todos os modais (CapsuleModal, VortexModal, Leaderboard, ReportModal)
-subidos para z-index:10000.
-**Licao:** Ao subir z-index de overlays de UI, SEMPRE verificar se modais que
-abrem por cima tambem foram atualizados. Manter hierarquia documentada:
-  0 = AR canvas | 5 = scanlines | 9998 = NearbyOverlay | 9999 = UI overlay
-  10000 = modais | 10001 = XP toast
+**Causa 1:** CapsuleModal z-index:100 abaixo do UI overlay z-index:9999.
+**Causa 2:** createPortal para document.body falhava silenciosamente no Safari mobile.
+**Causa 3:** handleClose era async — se selfDestruct travava, modal nunca fechava.
+**Causa 4:** NearbyOverlay markers (z:9998) abaixo do overlay (z:9999) — eventos nunca chegavam.
+**Fix final:** CapsuleModal REESCRITO do zero. Sem createPortal, sem async, sem
+animacao de destroy. Close SEMPRE sincrono. Botao "Fechar e voltar" grande.
+**Hierarquia z-index DEFINITIVA:**
+  0 = AR canvas | 5 = scanlines | 9999 = UI overlay (pointerEvents:none)
+  10000 = NearbyOverlay markers (pointerEvents:auto) | 10001 = XP toast
+  10002 = TODOS os modais (CapsuleModal, Vortex, Leaderboard, Report)
+**Licao:** Em mobile: (1) NUNCA usar createPortal. (2) NUNCA usar async no close.
+(3) SEMPRE ter botao de fechar grande e obvio. (4) Documentar z-index hierarchy.
 
 ### Bug: Botoes da camera nao funcionam no Android
 **Sintoma:** Shutter, flip, mode buttons nao respondiam ao toque.
@@ -409,11 +421,24 @@ Godmode e app compartilham o mesmo Supabase client (mesmo localStorage).
 Se godmode faz signOut, mata a sessao do app. Solucao: godmode so NAVEGA
 para /app, nunca chama signOut. A sessao e compartilhada, o acesso e separado.
 
+### Por que ready e persistido em sessionStorage?
+O bug "duplo clique para abrir portal" foi causado por TOKEN_REFRESHED
+resetando profile, que flipava legalGatesCleared, que re-avaliava os gates.
+A solucao nuclear: ready=true e salvo em sessionStorage. Sobrevive a qualquer
+re-render, refetch, ou evento de auth. So logout limpa.
+
+### Por que cada HTML tem seu proprio CSP?
+Vite multi-entry build gera 3 HTMLs (index, app, godmode). Cada um tem
+meta tag CSP independente. Ao adicionar features com CDN externo (Leaflet,
+CartoDB), TODOS os CSPs precisam ser atualizados. Esse bug aconteceu 2x.
+
 ---
 
 ## 10. COMMITS (HISTORICO COMPLETO)
 
 ```
+d4b245c  Add Publicacoes page to Godmode — visual feed of ALL capsules
+c557adc  Update PROJETO.md with latest bugs
 d81afba  Fix godmode map empty: RLS blocked admin from reading capsules
 083da2a  Fix godmode map: CSP blocked Leaflet CSS and map tiles
 258eb3d  Rewrite CapsuleModal from scratch — simple, always works
