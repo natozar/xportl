@@ -1,16 +1,23 @@
 import React, { useEffect, useState, useRef } from 'react';
+import ReactDOM from 'react-dom';
 import { isCapsuleLocked, isGhostCapsule, getTimeRemaining, haptic, consumeView, selfDestruct } from '../services/capsules';
 import { shareCapsule } from '../services/share';
 
 export default function CapsuleModal({ capsule, onClose, onSelfDestruct, onReport }) {
   const [shareStatus, setShareStatus] = useState(null);
   const [viewsLeft, setViewsLeft] = useState(null);
+
+  // Debug: log when modal receives a capsule
+  if (capsule) console.log('[XPortl Modal] Rendering capsule:', capsule.id, capsule.content?.body);
   const [destroying, setDestroying] = useState(false);
   const [audioPlaying, setAudioPlaying] = useState(false);
   const audioRef = useRef(null);
   const consumedRef = useRef(false);
 
   if (!capsule) return null;
+
+  // Render as React Portal to document.body — escapes ALL parent z-index/transform contexts
+  const portalRoot = typeof document !== 'undefined' ? document.body : null;
 
   const locked = isCapsuleLocked(capsule);
   const ghost = isGhostCapsule(capsule);
@@ -86,7 +93,7 @@ export default function CapsuleModal({ capsule, onClose, onSelfDestruct, onRepor
 
   // ── Destroying overlay ──
   if (destroying) {
-    return (
+    return ReactDOM.createPortal(
       <div style={st.backdrop}>
         <div style={st.destroyContainer}>
           <div style={st.destroyGlitch}>
@@ -102,11 +109,11 @@ export default function CapsuleModal({ capsule, onClose, onSelfDestruct, onRepor
             <div style={st.destroyBarFill} />
           </div>
         </div>
-      </div>
-    );
+      </div>,
+    portalRoot);
   }
 
-  return (
+  return ReactDOM.createPortal(
     <div style={st.backdrop} onClick={handleClose}>
       <div
         style={{
@@ -271,8 +278,8 @@ export default function CapsuleModal({ capsule, onClose, onSelfDestruct, onRepor
           )}
         </div>
       </div>
-    </div>
-  );
+    </div>,
+  portalRoot);
 }
 
 const st = {

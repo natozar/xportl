@@ -100,7 +100,10 @@ export default function App() {
   // ── App state ──
   const geo = useGeolocation();
   const cam = useCamera();
-  const [ready, setReady] = useState(false);
+  // ready is persisted in sessionStorage — survives re-renders, React strict mode,
+  // TOKEN_REFRESHED, profile refetches, and any other state fluctuation.
+  // Only a full page reload or logout clears it.
+  const [ready, setReady] = useState(() => sessionStorage.getItem('xportl_ready') === '1');
   const [saving, setSaving] = useState(false);
   const [nearbyCapsules, setNearbyCapsules] = useState([]);
   const [lastScan, setLastScan] = useState(null);
@@ -127,6 +130,7 @@ export default function App() {
       resolved = true;
 
       if (event === 'SIGNED_OUT') {
+        sessionStorage.removeItem('xportl_ready');
         setSession(null);
         setProfile(null);
         setBlocked(null);
@@ -260,13 +264,15 @@ export default function App() {
   const legalGatesCleared = session && profile && !showTos && !showDisclaimer && !blocked
     && hasAcceptedTos(profile) && hasAcceptedLocationDisclaimer(profile);
 
-  // Once ready is true, it stays true forever (until explicit logout).
-  // This prevents TOKEN_REFRESHED or profile refetch from "closing" the AR view.
-  useEffect(() => {
-    if (permissionsGranted && legalGatesCleared && !ready) {
-      console.log('[XPortl] ALL GATES CLEAR — entering AR (permanent)');
+  const markReady = () => {
+    if (!ready) {
+      sessionStorage.setItem('xportl_ready', '1');
       setReady(true);
     }
+  };
+
+  useEffect(() => {
+    if (permissionsGranted && legalGatesCleared && !ready) markReady();
   }, [permissionsGranted, legalGatesCleared, ready]);
 
   // ── Polling (safety net) ──
@@ -499,7 +505,8 @@ export default function App() {
 
   // ── Capsule click ──
   const handleCapsuleClick = useCallback((capsule) => {
-    setSelectedCapsule(capsule);
+    console.log('[XPortl] Capsule clicked:', capsule?.id, capsule?.content?.body);
+    setSelectedCapsule({ ...capsule });
     if (session?.user?.id) {
       logAccess({ userId: session.user.id, action: 'view_capsule', targetId: capsule.id, lat: geo.lat, lng: geo.lng });
       // Award XP for discovering (only if not own capsule)
@@ -543,49 +550,42 @@ export default function App() {
     return <AuthGate />;
   }
 
-  // 3. Blocked account
-  if (blocked) {
-    return (
-      <div style={{ width: '100%', height: '100%', background: 'var(--bg-void)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 32, textAlign: 'center' }}>
-        <div>
-          <h2 style={{ color: 'var(--danger)', fontSize: '1rem', marginBottom: 8 }}>Conta bloqueada</h2>
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>{blocked.reason}</p>
+  // Gates 3-6: ONLY shown if not yet in AR mode (ready=false).
+  // Once ready=true (persisted in sessionStorage), these are PERMANENTLY skipped.
+  // This eliminates ALL "open-close-reopen" bugs caused by state fluctuation.
+  if (!ready) {
+    if (blocked) {
+      return (
+        <div style={{ width: '100%', height: '100%', background: 'var(--bg-void)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 32, textAlign: 'center' }}>
+          <div>
+            <h2 style={{ color: 'var(--danger)', fontSize: '1rem', marginBottom: 8 }}>Conta bloqueada</h2>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>{blocked.reason}</p>
+          </div>
         </div>
-      </div>
-    );
+      );
+    }
+    if (emailUnverified) {
+      return (
+        <div style={{ width: '100%', height: '100%', background: 'var(--bg-void)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 32, textAlign: 'center' }}>
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" style={{ marginBottom: 16 }}>
+            <rect x="2" y="4" width="20" height="16" rx="3" stroke="#00f0ff" strokeWidth="1.5" />
+            <path d="M2 7l10 6 10-6" stroke="#00f0ff" strokeWidth="1.5" />
+          </svg>
+          <h2 style={{ color: '#00f0ff', fontSize: '0.9rem', fontWeight: 700, letterSpacing: '0.15em', marginBottom: 8 }}>CONFIRME SEU E-MAIL</h2>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.75rem', lineHeight: 1.6, maxWidth: 300 }}>
+            Enviamos um link para <strong style={{ color: '#00f0ff' }}>{session.user.email}</strong>.
+          </p>
+          <button onClick={() => window.location.reload()}
+            style={{ marginTop: 20, padding: '10px 24px', borderRadius: 12, background: 'rgba(0,240,255,0.08)', border: '1px solid rgba(0,240,255,0.15)', color: '#00f0ff', fontSize: '0.75rem', fontWeight: 600, fontFamily: 'inherit' }}>
+            Ja confirmei
+          </button>
+        </div>
+      );
+    }
+    if (showTos) return <TosModal onAccept={handleAcceptTos} />;
+    if (showDisclaimer) return <LocationDisclaimer onAccept={handleAcceptDisclaimer} />;
+    return <PermissionGate geo={geo} cam={cam} onComplete={markReady} />;
   }
-
-  // 4. Email verification (email/password signups only)
-  if (emailUnverified) {
-    return (
-      <div style={{ width: '100%', height: '100%', background: 'var(--bg-void)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 32, textAlign: 'center' }}>
-        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" style={{ marginBottom: 16 }}>
-          <rect x="2" y="4" width="20" height="16" rx="3" stroke="#00f0ff" strokeWidth="1.5" />
-          <path d="M2 7l10 6 10-6" stroke="#00f0ff" strokeWidth="1.5" />
-        </svg>
-        <h2 style={{ color: '#00f0ff', fontSize: '0.9rem', fontWeight: 700, letterSpacing: '0.15em', marginBottom: 8 }}>CONFIRME SEU E-MAIL</h2>
-        <p style={{ color: 'var(--text-muted)', fontSize: '0.75rem', lineHeight: 1.6, maxWidth: 300 }}>
-          Enviamos um link de verificacao para <strong style={{ color: '#00f0ff' }}>{session.user.email}</strong>. Abra seu e-mail e clique no link para ativar sua conta.
-        </p>
-        <p style={{ color: 'rgba(255,255,255,0.2)', fontSize: '0.6rem', marginTop: 12 }}>Verifique tambem a pasta de spam.</p>
-        <button
-          onClick={() => window.location.reload()}
-          style={{ marginTop: 20, padding: '10px 24px', borderRadius: 12, background: 'rgba(0,240,255,0.08)', border: '1px solid rgba(0,240,255,0.15)', color: '#00f0ff', fontSize: '0.75rem', fontWeight: 600, fontFamily: 'inherit' }}
-        >
-          Ja confirmei — recarregar
-        </button>
-      </div>
-    );
-  }
-
-  // 5. ToS
-  if (showTos) return <TosModal onAccept={handleAcceptTos} />;
-
-  // 5. Location Disclaimer
-  if (showDisclaimer) return <LocationDisclaimer onAccept={handleAcceptDisclaimer} />;
-
-  // 6. Camera/GPS permissions — once ready=true, NEVER show this gate again
-  if (!ready) return <PermissionGate geo={geo} cam={cam} onComplete={() => setReady(true)} />;
 
   // ── Tab handler (Create tab opens the creation panel via explore view) ──
   const handleTabChange = (tab) => {
