@@ -1,6 +1,6 @@
 # XPORTL — Contexto Completo do Projeto
 
-**Atualizado:** 14 de abril de 2026
+**Atualizado:** 15 de abril de 2026
 **Repo:** https://github.com/natozar/xportl
 **Deploy:** https://xportl.vercel.app
 **Godmode:** https://xportl.vercel.app/godmode
@@ -275,6 +275,28 @@ direcionais independente da precisao do GPS. Offset reduzido para 0.3m.
 **Licao:** GPS nao e confiavel para posicionamento preciso. Sempre ter fallback
 visual baseado em compass/bearing.
 
+### Bug: Tela preta ao clicar na capsula (modal bloqueava retorno)
+**Sintoma:** Usuario tocava na capsula, tela ficava preta, sem como voltar.
+**Causa:** (1) createPortal renderizava no body mas falhava em Safari mobile.
+(2) handleClose era async — se selfDestruct travasse, modal nunca fechava.
+(3) NearbyOverlay markers (z:9998) ficavam abaixo do UI overlay (z:9999).
+**Fix:** Reescreveu CapsuleModal do zero — sem createPortal, sem async,
+close SEMPRE sincrono. Botao "Fechar e voltar" grande. z-index: 10002.
+NearbyOverlay subido para z:10000.
+**Licao:** Em mobile, NUNCA usar createPortal (pode falhar silenciosamente).
+NUNCA usar async em handleClose. SEMPRE ter botao de fechar obvio e grande.
+
+### Bug: Godmode mapa vazio (nao mostra capsulas)
+**Sintoma:** Pagina "mapa capsulas" no godmode carregava mas sem pins.
+**Causa:** (1) CSP do godmode.html bloqueava Leaflet CSS (unpkg.com) e tiles
+(cartocdn.com). (2) RLS da tabela capsules nao tinha policy para admins —
+query retornava 0 rows.
+**Fix:** (1) CSP atualizado com unpkg.com + cartocdn.com + openstreetmap.org.
+(2) migration_011 adiciona policy "Admins can read all capsules".
+**Licao:** Cada HTML entry (app.html, godmode.html) tem seu PROPRIO CSP.
+Ao adicionar features com recursos externos, atualizar TODOS os CSPs.
+Admins precisam de policies de SELECT separadas para ver tudo.
+
 ### Bug: Clicar na capsula nao abre nada (modal invisivel)
 **Sintoma:** Capsula aparecia no NearbyOverlay, usuario tocava, nada acontecia.
 **Causa:** CapsuleModal tinha z-index:100. O overlay de UI (NearbyOverlay,
@@ -392,6 +414,14 @@ para /app, nunca chama signOut. A sessao e compartilhada, o acesso e separado.
 ## 10. COMMITS (HISTORICO COMPLETO)
 
 ```
+d81afba  Fix godmode map empty: RLS blocked admin from reading capsules
+083da2a  Fix godmode map: CSP blocked Leaflet CSS and map tiles
+258eb3d  Rewrite CapsuleModal from scratch — simple, always works
+83830f4  Fix: modal close was async and could hang
+f44c821  Fix capsule click + godmode back button
+7529d29  Add Capsule Map to Godmode
+dcbeb20  NUCLEAR FIX: sessionStorage ready + portal fixes
+be3a515  Update PROJETO.md with modal z-index bug
 1af5408  Fix capsule modal invisible on tap: z-index below UI overlay
 7187a7a  Complete rewrite of PROJETO.md with full project memory
 3880080  DEFINITIVE fix: single-click portal + exact GPS placement
