@@ -379,6 +379,7 @@ const st = {
     border: '1px solid rgba(255,255,255,0.05)', borderRadius: 14,
     color: 'rgba(255,255,255,0.35)', fontFamily: 'inherit',
     position: 'relative', overflow: 'hidden', transition: 'all 0.2s ease',
+    touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
   },
   typeIcon: {
     width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -412,6 +413,7 @@ const st = {
     padding: '8px 4px', background: 'rgba(180,74,255,0.03)',
     border: '1px solid rgba(180,74,255,0.08)', borderRadius: 10,
     color: 'rgba(180,74,255,0.4)', fontFamily: 'inherit', transition: 'all 0.15s',
+    touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
   },
   ghostViewBtnActive: {
     background: 'rgba(180,74,255,0.1)', borderColor: 'rgba(180,74,255,0.3)',
@@ -434,6 +436,7 @@ const st = {
     border: '1px solid rgba(255,255,255,0.06)', borderRadius: 12,
     color: 'rgba(255,255,255,0.5)', fontSize: '0.55rem', fontWeight: 600,
     fontFamily: 'inherit', letterSpacing: '0.05em',
+    touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
   },
   mediaBtnActive: {
     background: 'rgba(255,51,102,0.1)', borderColor: 'rgba(255,51,102,0.3)', color: '#ff3366',
@@ -501,6 +504,7 @@ const st = {
     padding: '13px 12px', background: 'rgba(0,255,136,0.06)',
     border: '1px solid rgba(0,255,136,0.15)', borderRadius: 12,
     color: '#00ff88', fontSize: '0.68rem', fontWeight: 600, fontFamily: 'inherit',
+    touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
   },
   timeBtnLock: {
     background: 'rgba(180,74,255,0.04)', borderColor: 'rgba(180,74,255,0.12)', color: '#b44aff',

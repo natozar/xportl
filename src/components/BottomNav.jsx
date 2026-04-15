@@ -113,6 +113,9 @@ const s = {
     fontFamily: 'inherit',
     position: 'relative',
     transition: 'color 0.2s',
+    touchAction: 'manipulation',
+    WebkitTapHighlightColor: 'transparent',
+    pointerEvents: 'auto',
   },
   tabActive: {
     color: '#00f0ff',

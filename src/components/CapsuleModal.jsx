@@ -59,14 +59,20 @@ export default function CapsuleModal({ capsule, onClose, onSelfDestruct, onRepor
     onClose();
   };
 
-  const toggleAudio = () => {
+  const toggleAudio = async () => {
     if (!audioRef.current) return;
     if (audioPlaying) {
       audioRef.current.pause();
+      setAudioPlaying(false);
     } else {
-      audioRef.current.play();
+      try {
+        await audioRef.current.play();
+        setAudioPlaying(true);
+      } catch (err) {
+        console.warn('[XPortl] Audio play blocked:', err.message);
+        setAudioPlaying(false);
+      }
     }
-    setAudioPlaying(!audioPlaying);
   };
 
   // ── Destroying overlay ──

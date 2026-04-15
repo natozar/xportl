@@ -301,7 +301,7 @@ function buildCapsuleEntity(cap) {
 
   if (cap.media_type === 'audio' && cap.media_url) {
     const sound = document.createElement('a-entity');
-    sound.setAttribute('sound', `src: url(${cap.media_url}); autoplay: true; loop: true; volume: 0.3; maxDistance: 30; refDistance: 5; rolloffFactor: 2; distanceModel: inverse`);
+    sound.setAttribute('sound', `src: url(${cap.media_url}); autoplay: false; loop: true; volume: 0.3; maxDistance: 30; refDistance: 5; rolloffFactor: 2; distanceModel: inverse`);
     wrapper.appendChild(sound);
   }
 

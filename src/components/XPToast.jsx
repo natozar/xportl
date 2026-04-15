@@ -57,8 +57,8 @@ const ACTION_LABELS = {
 const s = {
   container: {
     position: 'fixed',
-    top: 'calc(16px + env(safe-area-inset-top, 0px))',
-    left: '50%', transform: 'translateX(-50%)',
+    top: 'calc(20px + env(safe-area-inset-top, 0px))',
+    left: '50%',
     zIndex: 10001, pointerEvents: 'none',
     transition: 'all 0.3s cubic-bezier(0.22, 1, 0.36, 1)',
   },

@@ -18,16 +18,25 @@ export function useCamera() {
     setState(s => ({ ...s, loading: true }));
 
     try {
-      // Force HD rear camera — this sets the quality baseline before AR.js takes over
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: { ideal: 'environment' },
-          width: { ideal: 1920, min: 1280 },
-          height: { ideal: 1080, min: 720 },
-          frameRate: { ideal: 30 },
-        },
-        audio: false,
-      });
+      // Try HD rear camera first, fallback to basic constraints on older devices
+      let stream;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: { ideal: 'environment' },
+            width: { ideal: 1920, min: 1280 },
+            height: { ideal: 1080, min: 720 },
+            frameRate: { ideal: 30 },
+          },
+          audio: false,
+        });
+      } catch (_) {
+        // Fallback: simpler constraints for older Android/iOS
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: 'environment' },
+          audio: false,
+        });
+      }
 
       setState({
         granted: true,

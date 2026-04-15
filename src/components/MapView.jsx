@@ -169,8 +169,9 @@ export default function MapView({ lat, lng, capsules, onSelectCapsule }) {
         const dist = cap.distance_meters !== undefined ? `${cap.distance_meters.toFixed(0)}m` : '?';
         const popupHtml = `
           <div style="
-            background:#13102a; color:#e8e8f0; padding:10px 14px;
+            background:rgba(19,16,42,0.95); color:#e8e8f0; padding:10px 14px;
             border-radius:10px; border:1px solid rgba(0,240,255,0.15);
+            backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px);
             font-family:-apple-system,sans-serif; font-size:12px;
             min-width:140px; box-shadow:0 4px 20px rgba(0,0,0,0.5);
           ">

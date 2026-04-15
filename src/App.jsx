@@ -651,6 +651,6 @@ export default function App() {
 }
 
 const styles = {
-  root: { width: '100%', height: '100%', position: 'relative' },
+  root: { width: '100%', height: '100dvh', position: 'relative' },
   overlay: { position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 9999 },
 };
