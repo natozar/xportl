@@ -60,10 +60,11 @@ if (typeof window !== 'undefined') {
 }
 
 function smartPlaceCoord(lat, lng, accuracy) {
-  // Minimal offset: 1m in the direction the user is looking.
-  // Just enough so AR.js doesn't render the entity at distance zero
-  // (which makes it invisible/behind the camera).
-  const dist = 1;
+  // Place capsule exactly where the user is standing.
+  // No random offset — NearbyOverlay handles visualization.
+  // A tiny nudge (0.3m) in compass direction prevents AR.js
+  // from rendering it at distance=0 (invisible behind camera).
+  const dist = 0.3;
 
   // Direction: use compass heading (where user is pointing the phone)
   // Fall back to random if compass not available
@@ -180,10 +181,11 @@ export default function App() {
   }, []);
 
   // ── Load profile when session changes (with retry for new OAuth users) ──
+  // IMPORTANT: Do NOT reset profile to null here — that causes legalGatesCleared
+  // to flip false momentarily, triggering re-renders that "close and reopen" the app.
   useEffect(() => {
     if (!session?.user?.id) {
-      setProfile(null);
-      setBlocked(null);
+      if (!ready) { setProfile(null); setBlocked(null); } // Only reset if not in AR yet
       return;
     }
 
@@ -258,10 +260,11 @@ export default function App() {
   const legalGatesCleared = session && profile && !showTos && !showDisclaimer && !blocked
     && hasAcceptedTos(profile) && hasAcceptedLocationDisclaimer(profile);
 
+  // Once ready is true, it stays true forever (until explicit logout).
+  // This prevents TOKEN_REFRESHED or profile refetch from "closing" the AR view.
   useEffect(() => {
-    console.log('[XPortl Gate]', { permissionsGranted, legalGatesCleared, ready, geoGranted: geo.granted, camGranted: cam.granted, hasProfile: !!profile, showTos, showDisclaimer, blocked: !!blocked });
     if (permissionsGranted && legalGatesCleared && !ready) {
-      console.log('[XPortl Gate] ALL CLEAR — mounting AR');
+      console.log('[XPortl] ALL GATES CLEAR — entering AR (permanent)');
       setReady(true);
     }
   }, [permissionsGranted, legalGatesCleared, ready]);
@@ -581,11 +584,8 @@ export default function App() {
   // 5. Location Disclaimer
   if (showDisclaimer) return <LocationDisclaimer onAccept={handleAcceptDisclaimer} />;
 
-  // 6. Camera/GPS permissions
-  if (!ready) return <PermissionGate geo={geo} cam={cam} onComplete={() => {
-    console.log('[XPortl Gate] onComplete called from PermissionGate');
-    setReady(true);
-  }} />;
+  // 6. Camera/GPS permissions — once ready=true, NEVER show this gate again
+  if (!ready) return <PermissionGate geo={geo} cam={cam} onComplete={() => setReady(true)} />;
 
   // ── Tab handler (Create tab opens the creation panel via explore view) ──
   const handleTabChange = (tab) => {
