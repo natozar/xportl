@@ -1,153 +1,201 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 
 /**
- * PortalAnimation — Multidimensional portal opening sequence.
+ * PortalAnimation — Cinematic dimensional rift opening.
  *
- * Stages:
- * 0.0s — Void. Single particle of light.
- * 0.4s — Light expands. Ring forms.
- * 0.8s — Ring spins. Energy tendrils radiate outward.
- * 1.2s — Portal TEARS open from center (circle clip expands).
- * 1.8s — Reality visible through portal. Edges glow.
- * 2.4s — Portal fully open. Fade out overlay.
- * 2.8s — Gone. AR view revealed.
+ * Pure CSS/SVG, no WebGL dependency. Runs 3.5 seconds.
+ * Three acts: Convergence → Rupture → Revelation.
  */
 export default function PortalAnimation({ onComplete }) {
-  const [phase, setPhase] = useState(0);
+  const [t, setT] = useState(0); // time in ms
+  const startRef = useRef(Date.now());
 
   useEffect(() => {
-    const timers = [
-      setTimeout(() => setPhase(1), 100),   // particles appear
-      setTimeout(() => setPhase(2), 500),   // ring forms
-      setTimeout(() => setPhase(3), 1000),  // tendrils
-      setTimeout(() => setPhase(4), 1500),  // portal tears open
-      setTimeout(() => setPhase(5), 2200),  // fully open
-      setTimeout(() => { setPhase(6); onComplete(); }, 2800), // done
-    ];
+    let raf;
+    const tick = () => {
+      const elapsed = Date.now() - startRef.current;
+      setT(elapsed);
+      if (elapsed < 3500) raf = requestAnimationFrame(tick);
+      else onComplete();
+    };
+    raf = requestAnimationFrame(tick);
 
-    // Haptic: dimensional tear
-    if (navigator.vibrate) {
-      setTimeout(() => navigator.vibrate([20, 30, 20]), 400);
-      setTimeout(() => navigator.vibrate([40, 20, 40, 20, 60]), 1000);
-      setTimeout(() => navigator.vibrate([80, 30, 80]), 1500);
-    }
+    // Haptics
+    setTimeout(() => navigator.vibrate?.([15, 20, 15, 20, 15]), 300);
+    setTimeout(() => navigator.vibrate?.([30, 15, 30, 15, 50, 15, 30]), 1200);
+    setTimeout(() => navigator.vibrate?.([100, 40, 100]), 2000);
 
-    return () => timers.forEach(clearTimeout);
+    return () => cancelAnimationFrame(raf);
   }, [onComplete]);
 
-  if (phase >= 6) return null;
+  const p = t / 3500; // 0→1 normalized progress
+
+  // Easing helpers
+  const easeOut = (x) => 1 - Math.pow(1 - x, 3);
+  const easeIn = (x) => x * x * x;
+
+  // Phase calculations
+  const convergence = Math.min(1, t / 1200);    // 0-1.2s
+  const rupture = Math.max(0, Math.min(1, (t - 1200) / 800)); // 1.2-2.0s
+  const revelation = Math.max(0, Math.min(1, (t - 2000) / 1000)); // 2.0-3.0s
+  const fadeOut = Math.max(0, Math.min(1, (t - 2800) / 700)); // 2.8-3.5s
+
+  // Derived values
+  const ringScale = easeOut(convergence) * (1 + rupture * 2);
+  const particleSpread = easeOut(convergence) * 35 + rupture * 50;
+  const coreScale = convergence < 0.5 ? easeOut(convergence * 2) : (1 - easeIn(rupture));
+  const tearScale = easeOut(rupture) * (1 + revelation);
+  const glowIntensity = rupture > 0 ? (1 - revelation * 0.7) : convergence * 0.3;
+
+  // 60 particles with different behaviors
+  const particles = Array.from({ length: 60 }, (_, i) => {
+    const angle = (i / 60) * Math.PI * 2;
+    const layer = i % 3; // 0=inner fast, 1=mid, 2=outer slow
+    const speed = [1.3, 1, 0.7][layer];
+    const size = [2, 3, 1.5][layer];
+    const colors = ['#00f0ff', '#b44aff', '#ff6b2b', '#00ff88', '#fff'];
+    const color = colors[i % colors.length];
+    const delay = (i / 60) * 0.3;
+    const dist = particleSpread * speed;
+
+    // During rupture, particles spiral outward
+    const spiralAngle = angle + (rupture * Math.PI * 0.5);
+
+    const x = Math.cos(spiralAngle) * dist;
+    const y = Math.sin(spiralAngle) * dist;
+    const opacity = convergence > 0.3 ? (1 - fadeOut) * (rupture > 0.5 ? (1 - (rupture - 0.5) * 2) : 1) : convergence;
+
+    return { x, y, size, color, opacity: Math.max(0, opacity), delay };
+  });
+
+  // Ring data
+  const rings = [
+    { r: 30 + ringScale * 80, width: 2, color: '#00f0ff', opacity: 0.6, dasharray: 'none', speed: 1 },
+    { r: 20 + ringScale * 60, width: 1.5, color: '#b44aff', opacity: 0.4, dasharray: '6 4', speed: -0.7 },
+    { r: 40 + ringScale * 100, width: 1, color: '#ff6b2b', opacity: 0.2, dasharray: '3 6', speed: 0.5 },
+    { r: 25 + ringScale * 70, width: 2.5, color: '#00f0ff', opacity: rupture > 0 ? 0.8 * (1 - rupture) : 0.3, dasharray: 'none', speed: 1.5 },
+  ];
+
+  if (fadeOut >= 1) return null;
 
   return (
-    <div style={{
-      ...s.container,
-      opacity: phase >= 5 ? 0 : 1,
-      transition: 'opacity 0.6s ease',
-    }}>
-      {/* Background void */}
-      <div style={s.void} />
-
-      {/* Particle field */}
-      <div style={{ ...s.particles, opacity: phase >= 1 ? 1 : 0 }}>
-        {Array.from({ length: 40 }, (_, i) => {
-          const angle = (i / 40) * 360;
-          const delay = (i * 0.05);
-          const dist = phase >= 3 ? 45 : 5;
-          return (
-            <div key={i} style={{
-              ...s.particle,
-              transform: `rotate(${angle}deg) translateY(-${dist}vh)`,
-              opacity: phase >= 2 ? (1 - i * 0.02) : 0.3,
-              transition: `transform ${0.8 + delay * 0.3}s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.5s`,
-              transitionDelay: `${delay}s`,
-              background: i % 3 === 0 ? '#00f0ff' : i % 3 === 1 ? '#b44aff' : '#ff6b2b',
-              width: i % 5 === 0 ? 3 : 2,
-              height: i % 5 === 0 ? 3 : 2,
-            }} />
-          );
-        })}
+    <div style={{ ...s.container, opacity: 1 - easeIn(fadeOut) }}>
+      {/* Deep void background */}
+      <div style={s.void}>
+        <div style={{ ...s.nebula, opacity: convergence * 0.4 * (1 - fadeOut) }} />
       </div>
 
-      {/* Outer ring */}
-      <svg style={{ ...s.svg, opacity: phase >= 2 ? 1 : 0 }} viewBox="0 0 400 400">
-        {/* Ring 1 — outer, slow */}
-        <circle cx="200" cy="200" r={phase >= 3 ? 160 : 40}
-          fill="none" stroke="url(#grad1)" strokeWidth="1.5"
-          style={{ transition: 'r 1s cubic-bezier(0.16, 1, 0.3, 1)', opacity: 0.6 }}
-        />
-        {/* Ring 2 — middle, medium */}
-        <circle cx="200" cy="200" r={phase >= 3 ? 120 : 30}
-          fill="none" stroke="url(#grad2)" strokeWidth="1"
-          style={{ transition: 'r 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.1s', opacity: 0.4 }}
-          strokeDasharray="8 4"
-        />
-        {/* Ring 3 — inner, fast */}
-        <circle cx="200" cy="200" r={phase >= 3 ? 80 : 20}
-          fill="none" stroke="#00f0ff" strokeWidth="2"
-          style={{ transition: 'r 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.2s', opacity: 0.8 }}
-        />
-        {/* Energy cross lines */}
-        {phase >= 3 && [0, 45, 90, 135].map((angle) => (
-          <line key={angle} x1="200" y1="200"
-            x2={200 + Math.cos(angle * Math.PI / 180) * 180}
-            y2={200 + Math.sin(angle * Math.PI / 180) * 180}
-            stroke={`rgba(0,240,255,${phase >= 4 ? 0 : 0.15})`}
-            strokeWidth="0.5"
-            style={{ transition: 'stroke 0.5s' }}
+      {/* SVG layer: rings + energy lines */}
+      <svg style={s.svg} viewBox="-200 -200 400 400">
+        <defs>
+          <radialGradient id="pg">
+            <stop offset="0%" stopColor="#00f0ff" stopOpacity="0.3" />
+            <stop offset="100%" stopColor="transparent" />
+          </radialGradient>
+          <filter id="glow">
+            <feGaussianBlur stdDeviation="3" result="blur" />
+            <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+          </filter>
+        </defs>
+
+        {/* Ambient glow */}
+        <circle r={tearScale * 120} fill="url(#pg)" opacity={glowIntensity} />
+
+        {/* Rings */}
+        {rings.map((ring, i) => (
+          <circle key={i} r={ring.r} fill="none"
+            stroke={ring.color} strokeWidth={ring.width}
+            strokeDasharray={ring.dasharray}
+            opacity={ring.opacity * (1 - fadeOut)}
+            transform={`rotate(${t * ring.speed * 0.05})`}
+            filter="url(#glow)"
           />
         ))}
-        {/* Gradients */}
-        <defs>
-          <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#00f0ff" />
-            <stop offset="50%" stopColor="#b44aff" />
-            <stop offset="100%" stopColor="#ff6b2b" />
-          </linearGradient>
-          <linearGradient id="grad2" x1="100%" y1="0%" x2="0%" y2="100%">
-            <stop offset="0%" stopColor="#b44aff" />
-            <stop offset="100%" stopColor="#00f0ff" />
-          </linearGradient>
-        </defs>
+
+        {/* Energy lines (during convergence) */}
+        {convergence > 0.2 && rupture < 0.8 && Array.from({ length: 8 }, (_, i) => {
+          const a = (i / 8) * Math.PI * 2 + t * 0.001;
+          const len = 50 + ringScale * 100;
+          return (
+            <line key={i}
+              x1={0} y1={0}
+              x2={Math.cos(a) * len} y2={Math.sin(a) * len}
+              stroke="#00f0ff" strokeWidth="0.5"
+              opacity={0.08 * (1 - rupture)}
+            />
+          );
+        })}
+
+        {/* Tear circle (portal opening) */}
+        {rupture > 0 && (
+          <circle r={tearScale * 80} fill="none"
+            stroke="#00f0ff" strokeWidth={3 - revelation * 2}
+            opacity={(1 - revelation * 0.5)}
+            filter="url(#glow)"
+          />
+        )}
       </svg>
 
-      {/* Spinning glow core */}
+      {/* Particles */}
+      <div style={s.particleContainer}>
+        {particles.map((p, i) => (
+          <div key={i} style={{
+            position: 'absolute',
+            width: p.size, height: p.size,
+            borderRadius: '50%',
+            background: p.color,
+            boxShadow: `0 0 ${p.size * 3}px ${p.color}`,
+            transform: `translate(${p.x}vmin, ${p.y}vmin)`,
+            opacity: p.opacity,
+            transition: 'none',
+          }} />
+        ))}
+      </div>
+
+      {/* Core orb */}
       <div style={{
         ...s.core,
-        transform: `scale(${phase >= 2 ? 1 : 0}) rotate(${phase * 90}deg)`,
-        opacity: phase >= 4 ? 0 : 1,
-        transition: 'transform 0.8s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.4s',
+        transform: `scale(${coreScale})`,
+        opacity: coreScale > 0.05 ? 1 : 0,
+        boxShadow: `0 0 ${30 + glowIntensity * 60}px #00f0ff, 0 0 ${60 + glowIntensity * 100}px rgba(0,240,255,0.3), 0 0 ${100 + glowIntensity * 140}px rgba(180,74,255,0.15)`,
       }}>
         <div style={s.coreInner} />
       </div>
 
-      {/* Portal tear (expanding circle mask) */}
-      <div style={{
-        ...s.tear,
-        transform: `scale(${phase >= 4 ? (phase >= 5 ? 3 : 1.5) : 0})`,
-        opacity: phase >= 4 ? 1 : 0,
-        transition: phase >= 5
-          ? 'transform 0.8s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s'
-          : 'transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s',
-      }}>
-        <div style={s.tearInner} />
-        <div style={s.tearRing} />
-      </div>
-
-      {/* Flash on tear */}
+      {/* Flash on rupture */}
       <div style={{
         ...s.flash,
-        opacity: phase === 4 ? 0.4 : 0,
-        transition: 'opacity 0.15s',
+        opacity: rupture > 0 && rupture < 0.3 ? (0.3 - rupture) * 2 : 0,
       }} />
 
-      {/* Brand text */}
+      {/* Dimensional rift edges (after tear) */}
+      {revelation > 0 && (
+        <div style={{
+          ...s.rift,
+          transform: `scale(${0.5 + revelation * 2})`,
+          opacity: (1 - fadeOut) * 0.6,
+        }}>
+          <div style={s.riftEdge} />
+        </div>
+      )}
+
+      {/* Brand */}
       <div style={{
         ...s.brand,
-        opacity: phase >= 1 && phase < 5 ? 1 : 0,
-        transform: `translateY(${phase >= 2 ? 0 : 10}px)`,
-        transition: 'opacity 0.5s, transform 0.5s',
+        opacity: convergence > 0.3 && fadeOut < 0.5 ? Math.min(1, (convergence - 0.3) * 3) * (1 - fadeOut * 2) : 0,
+        transform: `translateY(${(1 - easeOut(convergence)) * 15}px) scale(${0.9 + easeOut(convergence) * 0.1})`,
       }}>
+        <div style={s.brandGlow} />
         <span style={s.brandX}>X</span>
-        <span style={s.brandText}>PORTL</span>
+        <span style={s.brandName}>PORTL</span>
+      </div>
+
+      {/* Subtitle */}
+      <div style={{
+        ...s.tagline,
+        opacity: convergence > 0.6 && rupture < 0.5 ? Math.min(1, (convergence - 0.6) * 4) * (1 - rupture * 2) : 0,
+      }}>
+        Deixe rastros. Encontre portais.
       </div>
     </div>
   );
@@ -161,66 +209,66 @@ const s = {
   },
   void: {
     position: 'absolute', inset: 0,
-    background: 'radial-gradient(circle at 50% 50%, #0d0a1a 0%, #050310 60%, #000 100%)',
+    background: '#020108',
   },
-  particles: {
-    position: 'absolute', width: 4, height: 4,
-    top: '50%', left: '50%', transition: 'opacity 0.5s',
-  },
-  particle: {
-    position: 'absolute', borderRadius: '50%',
-    top: -1, left: -1,
-    boxShadow: '0 0 6px currentColor',
+  nebula: {
+    position: 'absolute', inset: 0,
+    background: 'radial-gradient(ellipse at 40% 30%, rgba(180,74,255,0.08) 0%, transparent 50%), radial-gradient(ellipse at 60% 70%, rgba(0,240,255,0.06) 0%, transparent 50%)',
   },
   svg: {
-    position: 'absolute', width: '90vmin', height: '90vmin',
-    transition: 'opacity 0.5s',
-    animation: 'spin 8s linear infinite',
+    position: 'absolute', width: '100vmin', height: '100vmin',
+  },
+  particleContainer: {
+    position: 'absolute', width: 0, height: 0,
   },
   core: {
-    position: 'absolute', width: 60, height: 60,
-    borderRadius: '50%',
+    position: 'absolute', width: 24, height: 24,
+    borderRadius: '50%', transition: 'none',
   },
   coreInner: {
     width: '100%', height: '100%', borderRadius: '50%',
-    background: 'radial-gradient(circle, #fff 0%, #00f0ff 40%, transparent 70%)',
-    boxShadow: '0 0 40px #00f0ff, 0 0 80px rgba(0,240,255,0.3), 0 0 120px rgba(180,74,255,0.15)',
-  },
-  tear: {
-    position: 'absolute',
-    width: '70vmin', height: '70vmin',
-    borderRadius: '50%',
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
-  },
-  tearInner: {
-    width: '100%', height: '100%', borderRadius: '50%',
-    background: 'radial-gradient(circle, transparent 40%, rgba(0,240,255,0.05) 60%, rgba(180,74,255,0.08) 80%, transparent 100%)',
-    border: '2px solid rgba(0,240,255,0.2)',
-    boxShadow: '0 0 60px rgba(0,240,255,0.15), inset 0 0 60px rgba(0,240,255,0.05)',
-  },
-  tearRing: {
-    position: 'absolute', inset: -4, borderRadius: '50%',
-    border: '1px solid rgba(180,74,255,0.3)',
-    animation: 'spin 3s linear infinite reverse',
+    background: 'radial-gradient(circle, #fff 0%, #00f0ff 50%, transparent 100%)',
   },
   flash: {
     position: 'absolute', inset: 0,
-    background: 'radial-gradient(circle, rgba(0,240,255,0.6), transparent 60%)',
-    pointerEvents: 'none',
-    transition: 'opacity 0.15s',
+    background: 'radial-gradient(circle, rgba(0,240,255,0.8) 0%, rgba(180,74,255,0.2) 30%, transparent 60%)',
+  },
+  rift: {
+    position: 'absolute', width: '80vmin', height: '80vmin',
+    borderRadius: '50%',
+  },
+  riftEdge: {
+    width: '100%', height: '100%', borderRadius: '50%',
+    border: '1px solid rgba(0,240,255,0.15)',
+    boxShadow: 'inset 0 0 40px rgba(0,240,255,0.03), 0 0 30px rgba(0,240,255,0.05)',
+    animation: 'spin 6s linear infinite reverse',
   },
   brand: {
-    position: 'absolute', bottom: '18%',
-    display: 'flex', alignItems: 'baseline', gap: 2,
+    position: 'absolute', bottom: '20%',
+    display: 'flex', alignItems: 'baseline', gap: 3,
+    zIndex: 2,
+  },
+  brandGlow: {
+    position: 'absolute', inset: '-20px -30px',
+    background: 'radial-gradient(ellipse, rgba(0,240,255,0.08), transparent 70%)',
+    borderRadius: '50%',
   },
   brandX: {
-    fontSize: '2rem', fontWeight: 700, color: '#00f0ff',
-    textShadow: '0 0 20px rgba(0,240,255,0.5)',
+    fontSize: '2.8rem', fontWeight: 700, color: '#00f0ff',
+    textShadow: '0 0 30px rgba(0,240,255,0.6), 0 0 60px rgba(0,240,255,0.2)',
     fontFamily: '-apple-system, system-ui, sans-serif',
+    position: 'relative',
   },
-  brandText: {
-    fontSize: '1.2rem', fontWeight: 700, color: 'rgba(255,255,255,0.7)',
-    letterSpacing: '0.35em',
+  brandName: {
+    fontSize: '1.4rem', fontWeight: 700, color: 'rgba(255,255,255,0.75)',
+    letterSpacing: '0.4em',
+    fontFamily: '-apple-system, system-ui, sans-serif',
+    position: 'relative',
+  },
+  tagline: {
+    position: 'absolute', bottom: '14%',
+    fontSize: '0.72rem', color: 'rgba(255,255,255,0.3)',
+    letterSpacing: '0.15em', fontWeight: 500,
     fontFamily: '-apple-system, system-ui, sans-serif',
   },
 };
