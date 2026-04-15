@@ -45,7 +45,7 @@ const SCAN_RADIUS = 50;
 // entity doesn't render at distance zero (invisible, colocated with the
 // camera). Multiple capsules planted at the same spot spread in a small
 // circle around the user.
-const PLANT_OFFSET_METERS = 6;
+const PLANT_OFFSET_METERS = 1.5;
 function offsetCoord(lat, lng) {
   const bearing = Math.random() * 2 * Math.PI;
   const dLat = (PLANT_OFFSET_METERS * Math.cos(bearing)) / 111320;
