@@ -10,8 +10,11 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@lottiefiles/lottie-player": "^2.0.12",
     "@supabase/supabase-js": "^2.103.0",
     "@tensorflow/tfjs": "^4.22.0",
+    "framer-motion": "^12.38.0",
+    "gsap": "^3.15.0",
     "leaflet": "^1.9.4",
     "nsfwjs": "^4.3.0",
     "react": "^19.1.0",

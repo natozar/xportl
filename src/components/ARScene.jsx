@@ -64,11 +64,12 @@ export default function ARScene({ capsules, pings, onCapsuleClick, onVortexClick
     const scene = document.createElement('a-scene');
     scene.setAttribute('vr-mode-ui', 'enabled: false');
     scene.setAttribute('renderer', 'antialias: true; alpha: true; logarithmicDepthBuffer: true');
-    // Use device's actual viewport dimensions so the camera feed isn't stretched.
-    // Portrait phones need height > width. AR.js defaults to 640x480 which is terrible.
-    const vw = Math.max(window.innerWidth, window.innerHeight);
-    const vh = Math.min(window.innerWidth, window.innerHeight);
-    scene.setAttribute('arjs', `sourceType: webcam; debugUIEnabled: false; videoTexture: true; sourceWidth: ${vw * 2}; sourceHeight: ${vh * 2}; displayWidth: ${window.innerWidth}; displayHeight: ${window.innerHeight}`);
+    // Request HD camera. AR.js will use getUserMedia with these constraints.
+    // On portrait phones, swap width/height so the camera matches orientation.
+    const portrait = window.innerHeight > window.innerWidth;
+    const sw = portrait ? 1080 : 1920;
+    const sh = portrait ? 1920 : 1080;
+    scene.setAttribute('arjs', `sourceType: webcam; debugUIEnabled: false; videoTexture: true; sourceWidth: ${sw}; sourceHeight: ${sh}; displayWidth: ${window.innerWidth}; displayHeight: ${window.innerHeight}`);
 
     const camera = document.createElement('a-camera');
     camera.setAttribute('gps-camera', buildGpsCameraAttr());

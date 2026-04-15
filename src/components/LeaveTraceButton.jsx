@@ -94,7 +94,7 @@ export default function LeaveTraceButton({ onPress, saving }) {
         <div style={st.backdrop} onClick={handleClose}>
           <div style={st.panel} onClick={(e) => e.stopPropagation()}>
             <div style={st.handle} />
-            <h3 style={st.title}>PLANTAR CAPSULA</h3>
+            <h3 style={st.title}>Novo Portal</h3>
 
             {/* ── Capsule type selector ── */}
             <div style={st.sectionLabel}>TIPO DE CAPSULA</div>
@@ -314,11 +314,12 @@ const st = {
   fab: {
     position: 'fixed', bottom: 'calc(76px + env(safe-area-inset-bottom, 0px))',
     left: '50%', transform: 'translateX(-50%)',
-    zIndex: 35, pointerEvents: 'auto', width: 56, height: 56, borderRadius: '50%',
-    background: 'rgba(0,255,136,0.12)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
-    border: '1px solid rgba(0,255,136,0.3)', color: '#00ff88',
+    zIndex: 35, pointerEvents: 'auto', width: 60, height: 60, borderRadius: '50%',
+    background: 'linear-gradient(135deg, rgba(0,240,255,0.2), rgba(180,74,255,0.15))',
+    backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
+    border: '1.5px solid rgba(0,240,255,0.35)', color: '#00f0ff',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
-    boxShadow: '0 0 30px rgba(0,255,136,0.15)',
+    boxShadow: '0 4px 24px rgba(0,240,255,0.2), 0 0 0 1px rgba(0,240,255,0.08)',
   },
   toast: {
     position: 'fixed', bottom: 'calc(140px + env(safe-area-inset-bottom, 0px))',
@@ -340,29 +341,36 @@ const st = {
     display: 'flex', alignItems: 'flex-end', justifyContent: 'center', pointerEvents: 'auto',
   },
   panel: {
-    width: '100%', maxWidth: 420, maxHeight: '85vh', overflowY: 'auto',
-    background: 'rgba(14,14,20,0.92)', backdropFilter: 'blur(30px)', WebkitBackdropFilter: 'blur(30px)',
-    borderTop: '1px solid rgba(255,255,255,0.06)', borderRadius: '20px 20px 0 0',
-    padding: '12px 20px calc(32px + env(safe-area-inset-bottom, 0px))',
+    width: '100%', maxWidth: 440, maxHeight: '88vh', overflowY: 'auto',
+    background: 'rgba(10,8,18,0.97)',
+    backdropFilter: 'blur(40px) saturate(150%)', WebkitBackdropFilter: 'blur(40px) saturate(150%)',
+    borderTop: '1px solid rgba(255,255,255,0.04)',
+    borderRadius: '28px 28px 0 0',
+    padding: '8px 22px calc(28px + env(safe-area-inset-bottom, 0px))',
+    boxShadow: '0 -10px 40px rgba(0,0,0,0.4)',
   },
   handle: {
-    width: 36, height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.12)',
-    margin: '0 auto 14px',
+    width: 40, height: 5, borderRadius: 3,
+    background: 'rgba(255,255,255,0.1)',
+    margin: '0 auto 18px',
   },
   title: {
-    fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.2em',
-    color: 'var(--text-primary)', margin: '0 0 16px',
+    fontSize: '0.9rem', fontWeight: 600, letterSpacing: '0.04em',
+    color: '#f0f0f8', margin: '0 0 20px',
+    fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif',
   },
   sectionLabel: {
-    fontSize: '0.5rem', fontWeight: 700, letterSpacing: '0.2em',
-    color: 'rgba(255,255,255,0.2)', marginBottom: 8,
+    fontSize: '0.58rem', fontWeight: 600, letterSpacing: '0.12em',
+    color: 'rgba(255,255,255,0.25)', marginBottom: 10,
+    textTransform: 'uppercase',
   },
   messageInput: {
-    width: '100%', boxSizing: 'border-box', padding: '10px 12px',
-    background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)',
-    borderRadius: 10, color: 'var(--text-primary, #e8e8f0)', fontFamily: 'inherit',
-    fontSize: '0.8rem', lineHeight: 1.5, resize: 'vertical', minHeight: 48,
-    outline: 'none',
+    width: '100%', boxSizing: 'border-box', padding: '14px 16px',
+    background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)',
+    borderRadius: 16, color: '#f0f0f8',
+    fontFamily: '-apple-system, BlinkMacSystemFont, system-ui, sans-serif',
+    fontSize: '0.9rem', lineHeight: 1.5, resize: 'none', minHeight: 52,
+    outline: 'none', transition: 'border-color 0.2s',
   },
   charCount: {
     fontSize: '0.55rem', color: 'rgba(255,255,255,0.25)', textAlign: 'right',
@@ -371,14 +379,15 @@ const st = {
 
   // ── Type selector ──
   typeRow: {
-    display: 'flex', gap: 6, marginBottom: 6,
+    display: 'flex', gap: 8, marginBottom: 8,
   },
   typeBtn: {
     flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
-    padding: '12px 6px 10px', background: 'rgba(255,255,255,0.02)',
-    border: '1px solid rgba(255,255,255,0.05)', borderRadius: 14,
-    color: 'rgba(255,255,255,0.35)', fontFamily: 'inherit',
-    position: 'relative', overflow: 'hidden', transition: 'all 0.2s ease',
+    padding: '14px 8px 12px', background: 'rgba(255,255,255,0.025)',
+    border: '1px solid rgba(255,255,255,0.04)', borderRadius: 18,
+    color: 'rgba(255,255,255,0.4)',
+    fontFamily: '-apple-system, BlinkMacSystemFont, system-ui, sans-serif',
+    position: 'relative', overflow: 'hidden', transition: 'all 0.25s cubic-bezier(0.25, 1, 0.5, 1)',
     touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
   },
   typeIcon: {
@@ -431,12 +440,13 @@ const st = {
     display: 'flex', gap: 8, marginBottom: 12,
   },
   mediaBtn: {
-    flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
-    padding: '10px 8px', background: 'rgba(255,255,255,0.03)',
-    border: '1px solid rgba(255,255,255,0.06)', borderRadius: 12,
-    color: 'rgba(255,255,255,0.5)', fontSize: '0.55rem', fontWeight: 600,
-    fontFamily: 'inherit', letterSpacing: '0.05em',
+    flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5,
+    padding: '12px 8px', background: 'rgba(255,255,255,0.025)',
+    border: '1px solid rgba(255,255,255,0.04)', borderRadius: 16,
+    color: 'rgba(255,255,255,0.45)', fontSize: '0.6rem', fontWeight: 500,
+    fontFamily: '-apple-system, system-ui, sans-serif', letterSpacing: '0.02em',
     touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+    transition: 'all 0.2s',
   },
   mediaBtnActive: {
     background: 'rgba(255,51,102,0.1)', borderColor: 'rgba(255,51,102,0.3)', color: '#ff3366',
@@ -498,23 +508,28 @@ const st = {
   },
 
   // ── Time buttons ──
-  timeRow: { display: 'flex', gap: 8, marginBottom: 8 },
+  timeRow: { display: 'flex', gap: 10, marginBottom: 10, marginTop: 6 },
   timeBtn: {
-    flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-    padding: '13px 12px', background: 'rgba(0,255,136,0.06)',
-    border: '1px solid rgba(0,255,136,0.15)', borderRadius: 12,
-    color: '#00ff88', fontSize: '0.68rem', fontWeight: 600, fontFamily: 'inherit',
+    flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+    padding: '15px 14px',
+    background: 'linear-gradient(135deg, rgba(0,240,255,0.08), rgba(0,240,255,0.03))',
+    border: '1px solid rgba(0,240,255,0.12)', borderRadius: 16,
+    color: '#00f0ff', fontSize: '0.78rem', fontWeight: 600,
+    fontFamily: '-apple-system, system-ui, sans-serif',
     touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+    transition: 'all 0.2s',
   },
   timeBtnLock: {
-    background: 'rgba(180,74,255,0.04)', borderColor: 'rgba(180,74,255,0.12)', color: '#b44aff',
+    background: 'linear-gradient(135deg, rgba(180,74,255,0.08), rgba(180,74,255,0.03))',
+    borderColor: 'rgba(180,74,255,0.12)', color: '#b44aff',
   },
   timeDot: {
-    width: 6, height: 6, borderRadius: '50%', background: '#00ff88',
-    boxShadow: '0 0 6px rgba(0,255,136,0.4)',
+    width: 7, height: 7, borderRadius: '50%', background: '#00f0ff',
+    boxShadow: '0 0 8px rgba(0,240,255,0.5)',
   },
   cancelBtn: {
-    width: '100%', padding: '12px', background: 'transparent', border: 'none',
-    color: 'var(--text-muted)', fontSize: '0.7rem', fontFamily: 'inherit', marginTop: 4,
+    width: '100%', padding: '14px', background: 'transparent', border: 'none',
+    color: 'rgba(255,255,255,0.3)', fontSize: '0.75rem',
+    fontFamily: '-apple-system, system-ui, sans-serif', marginTop: 4,
   },
 };
