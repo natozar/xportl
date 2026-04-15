@@ -423,8 +423,22 @@ export default function App() {
       setNearbyCapsules(results.filter((c) => !c.moderation_status || c.moderation_status === 'active'));
       setLastScan(new Date().toLocaleTimeString('pt-BR'));
     } catch (err) {
-      console.error('[XPortl] Failed to create capsule:', err);
-      alert('Falha ao criar capsula: ' + (err?.message || 'erro desconhecido'));
+      const msg = err?.message || err?.error_description || JSON.stringify(err);
+      console.error('[XPortl] Failed to create capsule:', msg, err);
+
+      // Log to error_events for godmode visibility
+      supabase.from('error_events').insert({
+        source: 'client',
+        user_id: session.user.id,
+        url: window.location.href,
+        user_agent: navigator.userAgent,
+        error_name: 'CREATE_CAPSULE_FAILED',
+        error_message: msg,
+        error_stack: err?.stack || null,
+        severity: 'error',
+      }).then(() => {}).catch(() => {});
+
+      alert('Falha ao criar capsula:\n' + msg);
     } finally {
       setSaving(false);
     }
