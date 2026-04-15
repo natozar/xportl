@@ -1,6 +1,6 @@
 import React from 'react';
 
-export default function Radar({ lat, lng, altitude, nearbyCount = 0 }) {
+export default function Radar({ lat, lng, accuracy, nearbyCount = 0, scanRadius = 50 }) {
   return (
     <div style={s.container}>
       {/* Radar circle */}
@@ -25,10 +25,12 @@ export default function Radar({ lat, lng, altitude, nearbyCount = 0 }) {
         <span style={s.empty}>--</span>
       )}
 
-      {/* Coords */}
+      {/* Coords + debug */}
       {lat !== null && (
         <div style={s.coords}>
           {lat.toFixed(5)}, {lng.toFixed(5)}
+          {accuracy !== null && accuracy !== undefined && ` ±${accuracy.toFixed(0)}m`}
+          {` · ${scanRadius}m`}
         </div>
       )}
     </div>

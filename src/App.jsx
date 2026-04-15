@@ -634,7 +634,7 @@ export default function App() {
           />
 
           <div style={styles.overlay}>
-            <Radar lat={geo.lat} lng={geo.lng} altitude={geo.altitude} nearbyCount={nearbyCapsules.length} />
+            <Radar lat={geo.lat} lng={geo.lng} accuracy={geo.accuracy} nearbyCount={nearbyCapsules.length} scanRadius={SCAN_RADIUS} />
             <LeaveTraceButton onPress={handleLeaveTrace} saving={saving} />
             <VibePing onPing={handleVibePing} />
           </div>

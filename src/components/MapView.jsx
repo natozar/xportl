@@ -79,9 +79,9 @@ export default function MapView({ lat, lng, capsules, onSelectCapsule }) {
   const userMarkerRef = useRef(null);
   const [loading, setLoading] = useState(true);
 
-  // Initialize map
+  // Initialize map (wait for GPS)
   useEffect(() => {
-    if (!mapContainerRef.current || mapRef.current) return;
+    if (!mapContainerRef.current || mapRef.current || lat === null || lng === null) return;
 
     let cancelled = false;
 
@@ -90,7 +90,7 @@ export default function MapView({ lat, lng, capsules, onSelectCapsule }) {
       if (cancelled || mapRef.current) return;
 
       const map = leaflet.map(mapContainerRef.current, {
-        center: [lat || -23.55, lng || -46.63],
+        center: [lat, lng],
         zoom: 17,
         zoomControl: false,
         attributionControl: false,
@@ -125,7 +125,7 @@ export default function MapView({ lat, lng, capsules, onSelectCapsule }) {
         mapRef.current = null;
       }
     };
-  }, []);
+  }, [lat, lng]);
 
   // Update user position
   useEffect(() => {
