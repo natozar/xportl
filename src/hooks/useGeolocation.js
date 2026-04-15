@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 
 export function useGeolocation() {
   const [state, setState] = useState({
@@ -13,44 +13,61 @@ export function useGeolocation() {
     watchId: null,
   });
 
+  const resolveRef = useRef(null);
+
+  // request() returns a Promise that resolves when the FIRST position arrives
+  // or rejects on permission denial. This allows PermissionGate to await it.
   const request = useCallback(() => {
     if (!('geolocation' in navigator)) {
       setState(s => ({ ...s, denied: true, error: 'Geolocation not supported' }));
-      return;
+      return Promise.reject(new Error('Geolocation not supported'));
     }
 
     setState(s => ({ ...s, loading: true }));
 
-    const watchId = navigator.geolocation.watchPosition(
-      (pos) => {
-        setState({
-          granted: true,
-          denied: false,
-          loading: false,
-          lat: pos.coords.latitude,
-          lng: pos.coords.longitude,
-          altitude: pos.coords.altitude,
-          accuracy: pos.coords.accuracy,
-          error: null,
-          watchId,
-        });
-      },
-      (err) => {
-        setState(s => ({
-          ...s,
-          loading: false,
-          denied: true,
-          error: err.message,
-        }));
-      },
-      {
-        enableHighAccuracy: true,
-        maximumAge: 5000,
-        timeout: 25000,
-      }
-    );
+    return new Promise((resolve, reject) => {
+      resolveRef.current = resolve;
 
-    setState(s => ({ ...s, watchId }));
+      const watchId = navigator.geolocation.watchPosition(
+        (pos) => {
+          setState({
+            granted: true,
+            denied: false,
+            loading: false,
+            lat: pos.coords.latitude,
+            lng: pos.coords.longitude,
+            altitude: pos.coords.altitude,
+            accuracy: pos.coords.accuracy,
+            error: null,
+            watchId,
+          });
+          // Resolve the promise on first successful position
+          if (resolveRef.current) {
+            resolveRef.current(pos);
+            resolveRef.current = null;
+          }
+        },
+        (err) => {
+          setState(s => ({
+            ...s,
+            loading: false,
+            denied: true,
+            error: err.message,
+          }));
+          if (resolveRef.current) {
+            reject(err);
+            resolveRef.current = null;
+          }
+        },
+        {
+          enableHighAccuracy: true,
+          maximumAge: 5000,
+          timeout: 25000,
+        }
+      );
+
+      setState(s => ({ ...s, watchId }));
+    });
   }, []);
 
   useEffect(() => {
