@@ -70,22 +70,34 @@ export async function createCapsule({ lat, lng, altitude, content, visibility_la
     media_type: media_type || null,
     views_left: views_left ?? null,
     created_by: created_by || null,
-    created_user_agent: navigator.userAgent,
   };
 
   if (!isSupabaseConfigured()) {
     return { ...capsule, id: `local_${Date.now()}`, views_count: 0, created_at: new Date().toISOString() };
   }
 
+  // Try insert with select (returns the created row)
   const { data, error } = await supabase
     .from('capsules')
     .insert(capsule)
-    .select()
+    .select('id, lat, lng, content, visibility_layer, created_at')
     .single();
 
   if (error) {
-    console.error('[XPortl] Insert failed:', error.message);
-    throw error;
+    // If .select() failed due to RLS but INSERT worked, try insert-only
+    console.warn('[XPortl] Insert+select failed, trying insert-only:', error.message);
+
+    const { error: insertError } = await supabase
+      .from('capsules')
+      .insert(capsule);
+
+    if (insertError) {
+      console.error('[XPortl] Insert failed:', insertError.message, insertError);
+      throw insertError;
+    }
+
+    // Return minimal data (capsule was created, we just can't read it back)
+    return { ...capsule, id: `created_${Date.now()}`, created_at: new Date().toISOString() };
   }
 
   return data;
