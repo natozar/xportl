@@ -57,21 +57,18 @@ export default function CapsuleModal({ capsule, onClose, onSelfDestruct, onRepor
     return () => window.removeEventListener('keydown', handler);
   }, []);
 
-  const handleClose = async () => {
-    // Check if capsule just died
+  const handleClose = () => {
+    // Ghost capsule just died — self-destruct in background, close immediately
     if (viewsLeft !== null && viewsLeft <= 0 && !destroying) {
       setDestroying(true);
       haptic([300, 100, 300, 100, 500]);
-
-      // Wait for the visual effect
-      await new Promise((r) => setTimeout(r, 2000));
-
-      // Self-destruct
-      await selfDestruct(capsule.id);
-      if (onSelfDestruct) onSelfDestruct(capsule.id);
-      onClose();
-      return;
+      // Fire self-destruct in background, don't block close
+      setTimeout(() => {
+        selfDestruct(capsule.id).catch(() => {});
+        if (onSelfDestruct) onSelfDestruct(capsule.id);
+      }, 2000);
     }
+    // ALWAYS close immediately — never block the user
     onClose();
   };
 
@@ -277,6 +274,11 @@ export default function CapsuleModal({ capsule, onClose, onSelfDestruct, onRepor
             </button>
           )}
         </div>
+
+        {/* Big close button at bottom — always accessible */}
+        <button style={st.bigCloseBtn} onClick={handleClose}>
+          Fechar e voltar
+        </button>
       </div>
     </div>,
   portalRoot);
@@ -370,6 +372,13 @@ const st = {
     fontSize: '0.5rem', color: 'rgba(255,51,102,0.5)', background: 'none',
     border: '1px solid rgba(255,51,102,0.12)', borderRadius: 6, padding: '3px 10px',
     fontFamily: 'inherit', fontWeight: 600, letterSpacing: '0.05em',
+  },
+  bigCloseBtn: {
+    width: '100%', padding: '14px', marginTop: 14, borderRadius: 14,
+    background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
+    color: 'var(--text-primary)', fontSize: '0.8rem', fontWeight: 600,
+    fontFamily: 'inherit', touchAction: 'manipulation',
+    WebkitTapHighlightColor: 'transparent', pointerEvents: 'auto',
   },
 
   // ── Destroy ──
