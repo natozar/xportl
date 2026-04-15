@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { supabase } from '../services/supabase';
 import Overview from './pages/Overview';
+import CapsuleMap from './pages/CapsuleMap';
 import Errors from './pages/Errors';
 import Flags from './pages/Flags';
 import KillSwitch from './pages/KillSwitch';
@@ -134,7 +135,7 @@ export default function App() {
     );
   }
 
-  const pages = { overview: Overview, errors: Errors, flags: Flags, killswitch: KillSwitch, audit: Audit };
+  const pages = { overview: Overview, map: CapsuleMap, errors: Errors, flags: Flags, killswitch: KillSwitch, audit: Audit };
   const Page = pages[route] || Overview;
 
   return (
@@ -148,6 +149,7 @@ export default function App() {
         </div>
         <nav style={s.nav}>
           <NavLink to="overview" active={route === 'overview'}>overview</NavLink>
+          <NavLink to="map" active={route === 'map'}>mapa capsulas</NavLink>
           <NavLink to="errors" active={route === 'errors'}>errors</NavLink>
           <NavLink to="flags" active={route === 'flags'}>feature flags</NavLink>
           <NavLink to="killswitch" active={route === 'killswitch'} danger>kill switch</NavLink>
