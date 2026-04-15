@@ -31,6 +31,9 @@ import {
   acceptTos, acceptLocationDisclaimer, isAccountBlocked,
 } from './services/auth';
 import { validateContent, checkRateLimit, checkRestrictedZone, logAccess, getMinorRestrictions } from './services/moderation';
+import { awardXP, updateStreak, tryGrantBadge } from './services/gamification';
+import XPToast from './components/XPToast';
+import Leaderboard from './components/Leaderboard';
 
 // Polling is now just a safety net behind the realtime subscription — if the
 // websocket drops or a change arrives while unfocused, the next poll catches
@@ -80,8 +83,10 @@ export default function App() {
   const [selectedVortex, setSelectedVortex] = useState(null);
   const [activePings, setActivePings] = useState([]);
   const [reportTarget, setReportTarget] = useState(null);
-  const [activeTab, setActiveTab] = useState('explore'); // explore | create | profile
+  const [activeTab, setActiveTab] = useState('explore');
   const [showSettings, setShowSettings] = useState(false);
+  const [xpEvent, setXpEvent] = useState(null);
+  const [showLeaderboard, setShowLeaderboard] = useState(false);
   const scanVersion = useRef(0);
 
   // ── Auth listener ──
@@ -182,6 +187,9 @@ export default function App() {
 
           if (!hasAcceptedTos(p)) { setShowTos(true); return; }
           if (!hasAcceptedLocationDisclaimer(p)) { setShowDisclaimer(true); return; }
+
+          // Update daily streak on successful profile load
+          updateStreak(session.user.id).catch(() => {});
           return;
         }
 
@@ -400,6 +408,16 @@ export default function App() {
         lng: geo.lng,
       });
 
+      // Award XP
+      const xpAction = visibilityLayer === 'ghost' ? 'create_ghost' : (mediaBlob ? 'create_media' : 'create_capsule');
+      const xpResult = await awardXP(session.user.id, xpAction);
+      if (xpResult) setXpEvent(xpResult);
+
+      // Check first capsule badge
+      tryGrantBadge(session.user.id, 'first_portal').catch(() => {});
+      if (unlockDate) tryGrantBadge(session.user.id, 'time_lord').catch(() => {});
+      if (mediaBlob) tryGrantBadge(session.user.id, 'media_creator').catch(() => {});
+
       scanVersion.current += 1;
       const results = await getNearbyCapsules(geo.lat, geo.lng, SCAN_RADIUS);
       setNearbyCapsules(results.filter((c) => !c.moderation_status || c.moderation_status === 'active'));
@@ -432,6 +450,10 @@ export default function App() {
     setSelectedCapsule(capsule);
     if (session?.user?.id) {
       logAccess({ userId: session.user.id, action: 'view_capsule', targetId: capsule.id, lat: geo.lat, lng: geo.lng });
+      // Award XP for discovering (only if not own capsule)
+      if (capsule.created_by !== session.user.id) {
+        awardXP(session.user.id, 'discover_capsule', capsule.id).then((r) => { if (r) setXpEvent(r); });
+      }
     }
   }, [session, geo.lat, geo.lng]);
 
@@ -579,6 +601,7 @@ export default function App() {
           profile={profile}
           onOpenSettings={() => setShowSettings(true)}
           onRefreshProfile={refreshProfile}
+          onOpenLeaderboard={() => setShowLeaderboard(true)}
         />
       )}
 
@@ -610,6 +633,17 @@ export default function App() {
           targetId={reportTarget.id}
           reporterId={session.user.id}
           onClose={() => setReportTarget(null)}
+        />
+      )}
+
+      {/* XP notification toast */}
+      <XPToast event={xpEvent} onDone={() => setXpEvent(null)} />
+
+      {/* Leaderboard modal */}
+      {showLeaderboard && (
+        <Leaderboard
+          currentUserId={session.user.id}
+          onClose={() => setShowLeaderboard(false)}
         />
       )}
     </div>

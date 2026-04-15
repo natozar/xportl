@@ -1,8 +1,9 @@
 import React, { useState, useRef } from 'react';
 import { updateDisplayName } from '../services/auth';
 import { supabase } from '../services/supabase';
+import { xpProgress, getLevelTitle, BADGES } from '../services/gamification';
 
-export default function ProfilePage({ session, profile, onOpenSettings, onRefreshProfile }) {
+export default function ProfilePage({ session, profile, onOpenSettings, onRefreshProfile, onOpenLeaderboard }) {
   const [editingName, setEditingName] = useState(false);
   const [name, setName] = useState(profile?.display_name || '');
   const [saving, setSaving] = useState(false);
@@ -106,11 +107,62 @@ export default function ProfilePage({ session, profile, onOpenSettings, onRefres
           <div style={s.chip}>{provider === 'google' ? 'Google' : provider === 'phone' ? 'Telefone' : 'Email'}</div>
         </div>
 
+        {/* ── XP & Level ── */}
+        {(() => {
+          const xp = xpProgress(profile?.total_xp || 0);
+          const title = getLevelTitle(xp.level);
+          const streak = profile?.streak_days || 0;
+          const userBadges = (profile?.badges || []).map((id) => BADGES[id]).filter(Boolean);
+
+          return (
+            <>
+              <div style={s.levelSection}>
+                <div style={s.levelHeader}>
+                  <span style={s.levelNum}>Lv.{xp.level}</span>
+                  <span style={s.levelTitle}>{title}</span>
+                  <span style={s.xpTotal}>{(profile?.total_xp || 0).toLocaleString()} XP</span>
+                </div>
+                <div style={s.xpBarTrack}>
+                  <div style={{ ...s.xpBarFill, width: `${xp.progress * 100}%` }} />
+                </div>
+                <div style={s.xpBarLabel}>
+                  <span>{xp.xpToNext} XP para nivel {xp.level + 1}</span>
+                  {streak > 0 && <span style={s.streakBadge}>🔥 {streak}d streak</span>}
+                </div>
+              </div>
+
+              {/* Badges */}
+              {userBadges.length > 0 && (
+                <div style={s.badgeSection}>
+                  <div style={s.badgeLabel}>BADGES ({userBadges.length})</div>
+                  <div style={s.badgeGrid}>
+                    {userBadges.map((b) => (
+                      <div key={b.id} style={s.badgeItem} title={b.desc}>
+                        <span style={s.badgeIcon}>{b.icon}</span>
+                        <span style={s.badgeName}>{b.name}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Leaderboard button */}
+              <button style={s.leaderboardBtn} onClick={onOpenLeaderboard}>
+                <span style={{ fontSize: '1rem', marginRight: 8 }}>🏆</span>
+                Leaderboard
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" style={{ marginLeft: 'auto', opacity: 0.2 }}>
+                  <path d="M9 6l6 6-6 6" stroke="currentColor" strokeWidth="1.5" />
+                </svg>
+              </button>
+            </>
+          );
+        })()}
+
         {/* Stats */}
         <div style={s.statsGrid}>
           <Stat label="Membro desde" value={profile?.created_at ? new Date(profile.created_at).toLocaleDateString('pt-BR') : '---'} />
           <Stat label="Status" value={profile?.account_status || 'active'} color={profile?.account_status === 'active' ? '#00f0ff' : '#ff3366'} />
-          <Stat label="Termos" value={profile?.accepted_tos_version || '---'} />
+          <Stat label="Nivel" value={`${profile?.level || 1}`} color="#b44aff" />
         </div>
 
         {/* Settings button */}
@@ -201,6 +253,68 @@ const s = {
     fontSize: '0.58rem', color: 'var(--text-muted)', background: 'rgba(255,255,255,0.03)',
     padding: '4px 10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.04)',
   },
+  // ── XP & Level ──
+  levelSection: {
+    width: '100%', maxWidth: 360, marginBottom: 16,
+    padding: '16px 18px', borderRadius: 16,
+    background: 'rgba(180,74,255,0.04)', border: '1px solid rgba(180,74,255,0.1)',
+  },
+  levelHeader: {
+    display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 8,
+  },
+  levelNum: {
+    fontSize: '1.2rem', fontWeight: 700, color: '#b44aff',
+    textShadow: '0 0 10px rgba(180,74,255,0.3)',
+  },
+  levelTitle: {
+    fontSize: '0.68rem', fontWeight: 600, color: 'rgba(180,74,255,0.6)',
+    letterSpacing: '0.06em',
+  },
+  xpTotal: {
+    fontSize: '0.6rem', color: 'rgba(255,255,255,0.3)', marginLeft: 'auto',
+  },
+  xpBarTrack: {
+    height: 4, borderRadius: 2, background: 'rgba(180,74,255,0.1)', overflow: 'hidden',
+  },
+  xpBarFill: {
+    height: '100%', borderRadius: 2, background: '#b44aff',
+    boxShadow: '0 0 8px rgba(180,74,255,0.4)', transition: 'width 0.5s ease',
+  },
+  xpBarLabel: {
+    display: 'flex', justifyContent: 'space-between', marginTop: 6,
+    fontSize: '0.5rem', color: 'rgba(255,255,255,0.25)',
+  },
+  streakBadge: {
+    color: '#ffaa00', fontWeight: 600,
+  },
+
+  // ── Badges ──
+  badgeSection: {
+    width: '100%', maxWidth: 360, marginBottom: 16,
+  },
+  badgeLabel: {
+    fontSize: '0.48rem', fontWeight: 700, letterSpacing: '0.2em',
+    color: 'rgba(255,255,255,0.2)', marginBottom: 8,
+  },
+  badgeGrid: {
+    display: 'flex', flexWrap: 'wrap', gap: 6,
+  },
+  badgeItem: {
+    display: 'flex', alignItems: 'center', gap: 5,
+    padding: '5px 10px', borderRadius: 8,
+    background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)',
+  },
+  badgeIcon: { fontSize: '0.9rem' },
+  badgeName: { fontSize: '0.55rem', color: 'rgba(255,255,255,0.5)', fontWeight: 600 },
+
+  // ── Leaderboard button ──
+  leaderboardBtn: {
+    width: '100%', maxWidth: 360, display: 'flex', alignItems: 'center',
+    padding: '14px 16px', borderRadius: 14, marginBottom: 16,
+    background: 'rgba(0,240,255,0.03)', border: '1px solid rgba(0,240,255,0.08)',
+    color: '#00f0ff', fontSize: '0.78rem', fontWeight: 600, fontFamily: 'inherit',
+  },
+
   // ── Stats ──
   statsGrid: {
     display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8,
