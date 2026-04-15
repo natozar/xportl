@@ -6,6 +6,7 @@ import PermissionGate from './components/PermissionGate';
 import ARScene from './components/ARScene';
 import Radar from './components/Radar';
 import LeaveTraceButton from './components/LeaveTraceButton';
+import CreatePost from './components/CreatePost';
 import DebugPanel from './components/DebugPanel';
 import CapsuleModal from './components/CapsuleModal';
 import VortexModal from './components/VortexModal';
@@ -116,6 +117,7 @@ export default function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [xpEvent, setXpEvent] = useState(null);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
+  const [showCreatePost, setShowCreatePost] = useState(false);
   const scanVersion = useRef(0);
 
   // ── Auth listener ──
@@ -591,9 +593,8 @@ export default function App() {
   const handleTabChange = (tab) => {
     setShowSettings(false);
     if (tab === 'create') {
-      setActiveTab('explore'); // Stay on AR view
-      // The LeaveTraceButton will be triggered to open by a ref/callback
-      window.dispatchEvent(new CustomEvent('xportl:open-create'));
+      setActiveTab('explore');
+      setShowCreatePost(true);
     } else {
       setActiveTab(tab);
     }
@@ -629,7 +630,6 @@ export default function App() {
 
           <div style={styles.overlay}>
             <Radar lat={geo.lat} lng={geo.lng} altitude={geo.altitude} nearbyCount={nearbyCapsules.length} />
-            <LeaveTraceButton onPress={handleLeaveTrace} saving={saving} />
             <VibePing onPing={handleVibePing} />
           </div>
         </>
@@ -693,6 +693,18 @@ export default function App() {
           targetId={reportTarget.id}
           reporterId={session.user.id}
           onClose={() => setReportTarget(null)}
+        />
+      )}
+
+      {/* Create Post (fullscreen, above everything) */}
+      {showCreatePost && (
+        <CreatePost
+          saving={saving}
+          onClose={() => setShowCreatePost(false)}
+          onPost={async (data) => {
+            await handleLeaveTrace(data);
+            setShowCreatePost(false);
+          }}
         />
       )}
 
