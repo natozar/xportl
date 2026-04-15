@@ -7,6 +7,7 @@ import ARScene from './components/ARScene';
 import Radar from './components/Radar';
 import LeaveTraceButton from './components/LeaveTraceButton';
 import CreatePost from './components/CreatePost';
+import PortalAnimation from './components/PortalAnimation';
 import DebugPanel from './components/DebugPanel';
 import CapsuleModal from './components/CapsuleModal';
 import VortexModal from './components/VortexModal';
@@ -118,6 +119,7 @@ export default function App() {
   const [xpEvent, setXpEvent] = useState(null);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [showCreatePost, setShowCreatePost] = useState(false);
+  const [showPortalAnimation, setShowPortalAnimation] = useState(false);
   const scanVersion = useRef(0);
 
   // ── Auth listener ──
@@ -268,7 +270,10 @@ export default function App() {
 
   const markReady = () => {
     if (!ready) {
+      // Show portal animation on FIRST entry (not when restoring from localStorage)
+      const isFirstTime = !localStorage.getItem('xportl_ready');
       localStorage.setItem('xportl_ready', '1');
+      if (isFirstTime) setShowPortalAnimation(true);
       setReady(true);
     }
   };
@@ -694,6 +699,11 @@ export default function App() {
           reporterId={session.user.id}
           onClose={() => setReportTarget(null)}
         />
+      )}
+
+      {/* Portal opening animation (first time only) */}
+      {showPortalAnimation && (
+        <PortalAnimation onComplete={() => setShowPortalAnimation(false)} />
       )}
 
       {/* Create Post (fullscreen, above everything) */}
