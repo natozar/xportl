@@ -181,12 +181,15 @@ export async function getNearbyCapsules(lat, lng, radiusMeters = 50) {
   });
 
   if (!rpcError && rpcData) {
+    console.log(`[XPortl] RPC returned ${rpcData.length} capsules within ${radiusMeters}m`);
     return rpcData.map((c) => ({
       ...c,
       media_type: c.media_type || inferMediaType(c.media_url),
       distance_meters: c.distance_meters ?? haversineDistance(lat, lng, c.lat, c.lng),
     }));
   }
+
+  console.warn('[XPortl] RPC get_nearby_capsules failed:', rpcError?.message, '— using fallback SELECT');
 
   console.warn('[XPortl] RPC fallback:', rpcError?.message);
 
