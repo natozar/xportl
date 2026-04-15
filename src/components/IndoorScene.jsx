@@ -31,9 +31,16 @@ export default function IndoorScene({ capsules, onCapsuleFound, onClose }) {
   const [proximity, setProximity] = useState(null); // { distance, intensity, color }
   const [foundCapsule, setFoundCapsule] = useState(null);
 
-  // Check support on mount
+  // Check support on mount (with timeout — some browsers never resolve)
   useEffect(() => {
-    isImmersiveARSupported().then(setSupported);
+    let done = false;
+    const timeout = setTimeout(() => { if (!done) { done = true; setSupported(false); } }, 3000);
+    isImmersiveARSupported().then((ok) => {
+      if (!done) { done = true; setSupported(ok); clearTimeout(timeout); }
+    }).catch(() => {
+      if (!done) { done = true; setSupported(false); clearTimeout(timeout); }
+    });
+    return () => clearTimeout(timeout);
   }, []);
 
   // ── Start WebXR session ──
@@ -290,8 +297,9 @@ function drawReticle(gl, hit, glLayer) {
 
 const s = {
   container: {
-    position: 'fixed', inset: 0, zIndex: 100, background: '#000',
+    position: 'fixed', inset: 0, zIndex: 50, background: 'var(--bg-void, #0d0a1a)',
     pointerEvents: 'auto',
+    paddingBottom: 'calc(60px + env(safe-area-inset-bottom, 0px))',
   },
   canvas: {
     width: '100%', height: '100%', display: 'block',
