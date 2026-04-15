@@ -1,8 +1,8 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { isCapsuleLocked, isGhostCapsule, getTimeRemaining, haptic, consumeView, selfDestruct } from '../services/capsules';
-import { shareCapsule } from '../services/share';
 
 export default function CapsuleModal({ capsule, onClose, onSelfDestruct, onReport }) {
+  const [phase, setPhase] = useState('reveal'); // reveal → content
   const [viewsLeft, setViewsLeft] = useState(null);
   const [audioPlaying, setAudioPlaying] = useState(false);
   const audioRef = useRef(null);
@@ -14,23 +14,29 @@ export default function CapsuleModal({ capsule, onClose, onSelfDestruct, onRepor
   const ghost = isGhostCapsule(capsule);
   const timeLeft = getTimeRemaining(capsule);
   const content = capsule.content || {};
-  const distance = capsule.distance_meters;
   const accent = locked ? '#b44aff' : '#00f0ff';
+  const accentRgb = locked ? '180,74,255' : '0,240,255';
 
-  // Consume view on open (skip synthetic IDs)
+  // Reveal animation → show content after 1.2s
   useEffect(() => {
-    if (locked || consumedRef.current) return;
+    setPhase('reveal');
+    haptic(locked ? [200, 80, 200] : [60, 30, 60, 30, 120]);
+    const t = setTimeout(() => setPhase('content'), locked ? 1500 : 1200);
+    return () => clearTimeout(t);
+  }, [capsule.id]);
+
+  // Consume view
+  useEffect(() => {
+    if (locked || consumedRef.current || phase !== 'content') return;
     consumedRef.current = true;
     const isFake = capsule.id?.startsWith('created_') || capsule.id?.startsWith('local_');
     if (!isFake) {
       consumeView(capsule.id).then((r) => setViewsLeft(r?.views_left ?? null)).catch(() => {});
     }
-    haptic([80, 40, 80]);
     return () => { consumedRef.current = false; };
-  }, [capsule.id, locked]);
+  }, [capsule.id, locked, phase]);
 
   const handleClose = () => {
-    // Ghost self-destruct in background
     if (viewsLeft !== null && viewsLeft <= 0) {
       setTimeout(() => {
         selfDestruct(capsule.id).catch(() => {});
@@ -40,81 +46,117 @@ export default function CapsuleModal({ capsule, onClose, onSelfDestruct, onRepor
     onClose();
   };
 
-  const toggleAudio = async () => {
-    if (!audioRef.current) return;
-    try {
-      if (audioPlaying) { audioRef.current.pause(); setAudioPlaying(false); }
-      else { await audioRef.current.play(); setAudioPlaying(true); }
-    } catch (_) { setAudioPlaying(false); }
-  };
+  // ── PHASE 1: REVEAL ANIMATION ──
+  if (phase === 'reveal') {
+    return (
+      <div style={st.fullscreen} onClick={handleClose}>
+        <div style={st.revealContainer}>
+          {/* Pulsing rings */}
+          <div style={{ ...st.ring, width: 160, height: 160, animationDuration: '1.5s', borderColor: `rgba(${accentRgb},0.15)` }} />
+          <div style={{ ...st.ring, width: 120, height: 120, animationDuration: '1.2s', animationDelay: '0.2s', borderColor: `rgba(${accentRgb},0.25)` }} />
+          <div style={{ ...st.ring, width: 80, height: 80, animationDuration: '0.9s', animationDelay: '0.4s', borderColor: `rgba(${accentRgb},0.4)` }} />
 
+          {/* Core */}
+          <div style={{ ...st.revealCore, background: accent, boxShadow: `0 0 40px ${accent}, 0 0 80px rgba(${accentRgb},0.3)` }}>
+            {locked ? '🔒' : '✦'}
+          </div>
+
+          {/* Text */}
+          <div style={{ ...st.revealText, color: accent }}>
+            {locked ? 'RASTRO TRANCADO' : 'PORTAL ENCONTRADO'}
+          </div>
+          <div style={st.revealSub}>
+            {locked ? 'Trava temporal ativa' : 'Desbloqueando...'}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── PHASE 2: CONTENT ──
   return (
-    <div style={s.backdrop} onClick={handleClose}>
-      <div style={s.modal} onClick={(e) => e.stopPropagation()}>
+    <div style={st.fullscreen} onClick={handleClose}>
+      <div style={st.card} onClick={(e) => e.stopPropagation()}>
+
+        {/* Accent glow line */}
+        <div style={{ ...st.glowLine, background: `linear-gradient(90deg, transparent, ${accent}, transparent)` }} />
 
         {/* Header */}
-        <div style={s.header}>
-          <div style={{ ...s.dot, background: accent }} />
-          <div style={s.headerText}>
-            <div style={{ ...s.title, color: accent }}>
-              {locked ? 'TRANCADO' : 'PORTAL'}
-            </div>
-            <div style={s.subtitle}>
-              {distance !== undefined ? `${distance < 1 ? '<1' : distance.toFixed(0)}m` : ''}
-              {ghost && viewsLeft !== null && ` · ${viewsLeft} views`}
-            </div>
+        <div style={st.header}>
+          <div style={{ ...st.headerIcon, borderColor: `rgba(${accentRgb},0.3)`, boxShadow: `0 0 20px rgba(${accentRgb},0.15)` }}>
+            <span style={{ fontSize: '1.2rem' }}>{locked ? '🔒' : '✦'}</span>
           </div>
-          <button style={s.closeX} onClick={handleClose}>x</button>
+          <div style={{ flex: 1 }}>
+            <h2 style={{ ...st.title, color: accent }}>{locked ? 'TRANCADO' : 'PORTAL'}</h2>
+            <p style={st.subtitle}>
+              {capsule.distance_meters !== undefined && `${capsule.distance_meters < 1 ? '<1' : capsule.distance_meters.toFixed(0)}m`}
+              {ghost && viewsLeft !== null && ` · ${viewsLeft} restantes`}
+            </p>
+          </div>
         </div>
 
-        {/* Content */}
-        <div style={s.body}>
-          {locked ? (
-            <div style={s.lockedBox}>
-              <div style={s.lockedIcon}>🔒</div>
-              <p style={s.lockedText}>Rastro trancado temporariamente</p>
-              <p style={s.lockedTime}>{timeLeft || 'em breve'}</p>
-            </div>
-          ) : (
-            <>
-              {/* Media */}
-              {capsule.media_type === 'image' && capsule.media_url && (
-                <img src={capsule.media_url} alt="" style={s.mediaImg} />
-              )}
-              {capsule.media_type === 'video' && capsule.media_url && (
-                <video src={capsule.media_url} controls playsInline style={s.mediaImg} />
-              )}
-              {capsule.media_type === 'audio' && capsule.media_url && (
-                <button style={s.audioBtn} onClick={toggleAudio}>
-                  {audioPlaying ? '⏸ Pausar' : '▶ Ouvir audio'}
-                  <audio ref={audioRef} src={capsule.media_url} onEnded={() => setAudioPlaying(false)} />
-                </button>
-              )}
+        {/* Divider */}
+        <div style={{ ...st.divider, background: `linear-gradient(90deg, transparent, rgba(${accentRgb},0.12), transparent)` }} />
 
-              {/* Text */}
-              <p style={s.messageText}>{content.body || JSON.stringify(content)}</p>
-            </>
-          )}
-        </div>
+        {/* Body */}
+        {locked ? (
+          <div style={st.lockedBody}>
+            <div style={st.lockedEmoji}>⏳</div>
+            <p style={st.lockedTitle}>Volte a esta coordenada em</p>
+            <div style={st.countdown}>{timeLeft || '...'}</div>
+            <p style={st.lockedHint}>para desbloquear este misterio</p>
+          </div>
+        ) : (
+          <div style={st.contentBody}>
+            {/* Image */}
+            {capsule.media_type === 'image' && capsule.media_url && (
+              <img src={capsule.media_url} alt="" style={st.media} />
+            )}
+            {/* Video */}
+            {capsule.media_type === 'video' && capsule.media_url && (
+              <video src={capsule.media_url} controls playsInline style={st.media} />
+            )}
+            {/* Audio */}
+            {capsule.media_type === 'audio' && capsule.media_url && (
+              <button style={st.playBtn} onClick={() => {
+                if (!audioRef.current) return;
+                if (audioPlaying) { audioRef.current.pause(); setAudioPlaying(false); }
+                else { audioRef.current.play().then(() => setAudioPlaying(true)).catch(() => {}); }
+              }}>
+                <span style={{ fontSize: '1.2rem' }}>{audioPlaying ? '⏸' : '▶'}</span>
+                <span>{audioPlaying ? 'Pausar' : 'Ouvir mensagem'}</span>
+                <audio ref={audioRef} src={capsule.media_url} onEnded={() => setAudioPlaying(false)} />
+              </button>
+            )}
 
-        {/* Ghost bar */}
-        {ghost && viewsLeft !== null && !locked && (
-          <div style={s.ghostBar}>
-            <div style={{ ...s.ghostFill, width: `${Math.max(5, (viewsLeft / 10) * 100)}%`, background: viewsLeft <= 2 ? '#ff3366' : '#00f0ff' }} />
+            {/* Message */}
+            <p style={st.message}>{content.body || ''}</p>
           </div>
         )}
 
-        {/* Meta */}
-        <div style={s.meta}>
-          <span style={s.chip}>{capsule.visibility_layer || 'public'}</span>
-          {capsule.created_at && <span style={s.chip}>{new Date(capsule.created_at).toLocaleDateString('pt-BR')}</span>}
+        {/* Ghost progress */}
+        {ghost && viewsLeft !== null && !locked && (
+          <div style={st.ghostSection}>
+            <div style={st.ghostTrack}>
+              <div style={{ ...st.ghostFill, width: `${Math.max(5, (viewsLeft / 10) * 100)}%`, background: viewsLeft <= 2 ? '#ff3366' : accent }} />
+            </div>
+            <span style={{ fontSize: '0.5rem', color: viewsLeft <= 2 ? '#ff3366' : '#6b6b80', marginTop: 4, display: 'block' }}>
+              {viewsLeft <= 0 ? 'Ultima visualizacao — autodestruindo' : `${viewsLeft} views antes da autodestruicao`}
+            </span>
+          </div>
+        )}
+
+        {/* Footer */}
+        <div style={st.footer}>
+          <span style={st.chip}>{capsule.visibility_layer}</span>
+          {capsule.created_at && <span style={st.chip}>{new Date(capsule.created_at).toLocaleDateString('pt-BR')}</span>}
           {onReport && !locked && (
-            <button style={s.reportChip} onClick={() => { onClose(); if (onReport) onReport(capsule); }}>Denunciar</button>
+            <button style={st.reportBtn} onClick={() => { onClose(); onReport(capsule); }}>Denunciar</button>
           )}
         </div>
 
-        {/* Close button — big, obvious */}
-        <button style={s.closeBtn} onClick={handleClose}>
+        {/* Close */}
+        <button style={st.closeBtn} onClick={handleClose}>
           Fechar e voltar
         </button>
       </div>
@@ -122,79 +164,128 @@ export default function CapsuleModal({ capsule, onClose, onSelfDestruct, onRepor
   );
 }
 
-const s = {
-  backdrop: {
-    position: 'fixed', inset: 0,
-    background: 'rgba(0,0,0,0.7)',
-    backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)',
+const st = {
+  // ── Fullscreen backdrop ──
+  fullscreen: {
+    position: 'fixed', inset: 0, zIndex: 10002,
+    background: 'rgba(7,4,15,0.92)',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
-    zIndex: 10002, padding: 16,
-    pointerEvents: 'auto', touchAction: 'manipulation',
+    padding: 16, pointerEvents: 'auto', touchAction: 'manipulation',
+    animation: 'fadeIn 0.3s ease',
   },
-  modal: {
-    width: '100%', maxWidth: 380, maxHeight: '80vh', overflowY: 'auto',
-    background: '#0d0a1a',
-    border: '1px solid rgba(255,255,255,0.08)',
-    borderRadius: 20, padding: 20,
+
+  // ── Reveal phase ──
+  revealContainer: {
+    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+    position: 'relative', width: 200, height: 200,
+  },
+  ring: {
+    position: 'absolute', borderRadius: '50%',
+    border: '2px solid', animation: 'pulse-ring 1.5s ease-out infinite',
+  },
+  revealCore: {
+    width: 56, height: 56, borderRadius: '50%',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    fontSize: '1.5rem', zIndex: 2,
+    animation: 'fadeIn 0.5s ease 0.3s both',
+  },
+  revealText: {
+    marginTop: 24, fontSize: '0.8rem', fontWeight: 700,
+    letterSpacing: '0.25em', zIndex: 2,
+    animation: 'fadeIn 0.5s ease 0.6s both',
+  },
+  revealSub: {
+    marginTop: 6, fontSize: '0.6rem', color: 'rgba(255,255,255,0.35)',
+    animation: 'fadeIn 0.5s ease 0.8s both',
+  },
+
+  // ── Content card ──
+  card: {
+    width: '100%', maxWidth: 400, maxHeight: '85vh', overflowY: 'auto',
+    background: '#0d0a1a', borderRadius: 24,
+    border: '1px solid rgba(255,255,255,0.06)',
+    boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
     pointerEvents: 'auto',
+    animation: 'fadeIn 0.3s ease',
+  },
+  glowLine: {
+    height: 2, borderRadius: '24px 24px 0 0',
   },
   header: {
-    display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14,
+    display: 'flex', alignItems: 'center', gap: 14, padding: '20px 20px 0',
   },
-  dot: {
-    width: 12, height: 12, borderRadius: '50%', flexShrink: 0,
-    boxShadow: '0 0 10px currentColor',
+  headerIcon: {
+    width: 48, height: 48, borderRadius: 14,
+    border: '1.5px solid', display: 'flex', alignItems: 'center', justifyContent: 'center',
+    background: 'rgba(255,255,255,0.02)', flexShrink: 0,
   },
-  headerText: { flex: 1 },
-  title: { fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.15em' },
-  subtitle: { fontSize: '0.55rem', color: '#6b6b80', marginTop: 2 },
-  closeX: {
-    width: 32, height: 32, borderRadius: 10,
-    background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)',
-    color: '#6b6b80', fontSize: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center',
-    fontFamily: 'inherit', pointerEvents: 'auto', touchAction: 'manipulation',
+  title: {
+    fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.2em', margin: 0,
   },
-  body: { marginBottom: 12 },
-  messageText: {
-    fontSize: '1rem', lineHeight: 1.7, color: '#e8e8f0',
+  subtitle: {
+    fontSize: '0.58rem', color: '#6b6b80', marginTop: 3,
   },
-  mediaImg: {
-    width: '100%', maxHeight: 200, objectFit: 'cover', borderRadius: 12,
-    marginBottom: 10, display: 'block',
+  divider: {
+    height: 1, margin: '16px 0',
   },
-  audioBtn: {
-    width: '100%', padding: '12px', borderRadius: 12, marginBottom: 10,
-    background: 'rgba(0,240,255,0.06)', border: '1px solid rgba(0,240,255,0.12)',
-    color: '#00f0ff', fontSize: '0.78rem', fontWeight: 600, fontFamily: 'inherit',
+
+  // ── Locked ──
+  lockedBody: {
+    textAlign: 'center', padding: '12px 20px 20px',
+  },
+  lockedEmoji: { fontSize: '2.5rem', marginBottom: 10 },
+  lockedTitle: { fontSize: '0.75rem', color: 'rgba(180,74,255,0.7)', marginBottom: 8 },
+  countdown: {
+    fontSize: '1.8rem', fontWeight: 700, color: '#b44aff',
+    textShadow: '0 0 20px rgba(180,74,255,0.3)',
+    padding: '8px 0', letterSpacing: '0.05em',
+  },
+  lockedHint: { fontSize: '0.6rem', color: '#6b6b80', marginTop: 4 },
+
+  // ── Content ──
+  contentBody: { padding: '0 20px 16px' },
+  media: {
+    width: '100%', maxHeight: 260, objectFit: 'cover', borderRadius: 14,
+    marginBottom: 14, display: 'block', background: '#000',
+  },
+  playBtn: {
+    width: '100%', display: 'flex', alignItems: 'center', gap: 10,
+    padding: '14px 16px', borderRadius: 14, marginBottom: 14,
+    background: 'rgba(0,240,255,0.04)', border: '1px solid rgba(0,240,255,0.1)',
+    color: '#00f0ff', fontSize: '0.82rem', fontWeight: 600, fontFamily: 'inherit',
     pointerEvents: 'auto', touchAction: 'manipulation',
   },
-  lockedBox: {
-    textAlign: 'center', padding: '16px 0',
+  message: {
+    fontSize: '1.1rem', lineHeight: 1.7, color: '#f0f0f8', fontWeight: 400,
+    margin: 0,
   },
-  lockedIcon: { fontSize: '2rem', marginBottom: 8 },
-  lockedText: { fontSize: '0.82rem', color: '#b44aff', fontWeight: 600 },
-  lockedTime: { fontSize: '1.2rem', fontWeight: 700, color: '#b44aff', marginTop: 6 },
-  ghostBar: {
-    height: 3, borderRadius: 2, background: 'rgba(255,255,255,0.05)',
-    overflow: 'hidden', marginBottom: 10,
-  },
+
+  // ── Ghost ──
+  ghostSection: { padding: '0 20px 12px' },
+  ghostTrack: { height: 3, borderRadius: 2, background: 'rgba(255,255,255,0.04)', overflow: 'hidden' },
   ghostFill: { height: '100%', borderRadius: 2, transition: 'width 0.5s' },
-  meta: {
-    display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12,
+
+  // ── Footer ──
+  footer: {
+    display: 'flex', gap: 6, flexWrap: 'wrap', padding: '0 20px 10px',
   },
   chip: {
-    fontSize: '0.52rem', color: '#6b6b80', background: 'rgba(255,255,255,0.03)',
-    padding: '3px 8px', borderRadius: 6,
+    fontSize: '0.5rem', color: '#6b6b80', background: 'rgba(255,255,255,0.03)',
+    padding: '4px 10px', borderRadius: 8,
   },
-  reportChip: {
-    fontSize: '0.52rem', color: 'rgba(255,51,102,0.5)', background: 'none',
-    border: '1px solid rgba(255,51,102,0.12)', borderRadius: 6, padding: '3px 8px',
+  reportBtn: {
+    fontSize: '0.5rem', color: 'rgba(255,51,102,0.5)', background: 'none',
+    border: '1px solid rgba(255,51,102,0.1)', borderRadius: 8, padding: '4px 10px',
     fontFamily: 'inherit', marginLeft: 'auto', pointerEvents: 'auto',
+    touchAction: 'manipulation',
   },
+
+  // ── Close ──
   closeBtn: {
-    width: '100%', padding: '14px', borderRadius: 14,
-    background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
-    color: '#e8e8f0', fontSize: '0.82rem', fontWeight: 600,
+    width: 'calc(100% - 40px)', margin: '4px 20px 20px', padding: '15px',
+    borderRadius: 16, background: 'rgba(255,255,255,0.05)',
+    border: '1px solid rgba(255,255,255,0.08)',
+    color: '#e8e8f0', fontSize: '0.85rem', fontWeight: 600,
     fontFamily: 'inherit', touchAction: 'manipulation',
     WebkitTapHighlightColor: 'transparent', pointerEvents: 'auto',
   },
