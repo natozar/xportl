@@ -35,7 +35,13 @@ export default function CapsuleMap() {
         .order('created_at', { ascending: false })
         .limit(1000);
 
-      if (error) { console.error(error); setLoading(false); return; }
+      if (error) {
+        console.error('[Godmode] Capsule fetch error:', error);
+        setCapsules([]);
+        setLoading(false);
+        alert('Erro ao buscar capsulas: ' + error.message + '\n\nSe retornou 0 capsulas, rode migration_011_admin_read_all.sql no Supabase SQL Editor.');
+        return;
+      }
 
       const caps = data || [];
       setCapsules(caps);
