@@ -58,7 +58,7 @@ export default defineConfig({
         // App is at /app.html now; /index.html is the static LP and must not
         // be used as SPA fallback.
         navigateFallback: '/app.html',
-        navigateFallbackDenylist: [/^\/$/, /^\/index\.html$/, /^\/landing/],
+        navigateFallbackDenylist: [/^\/$/, /^\/index\.html$/, /^\/landing/, /^\/godmode/],
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/(aframe\.io|unpkg\.com|raw\.githack\.com|cdn\.jsdelivr\.net|cdn\.aframe\.io)\/.*/i,
