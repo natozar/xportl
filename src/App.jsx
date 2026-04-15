@@ -101,10 +101,10 @@ export default function App() {
   // ── App state ──
   const geo = useGeolocation();
   const cam = useCamera();
-  // ready is persisted in sessionStorage — survives re-renders, React strict mode,
+  // ready is persisted in localStorage — survives re-renders, React strict mode,
   // TOKEN_REFRESHED, profile refetches, and any other state fluctuation.
   // Only a full page reload or logout clears it.
-  const [ready, setReady] = useState(() => sessionStorage.getItem('xportl_ready') === '1');
+  const [ready, setReady] = useState(() => localStorage.getItem('xportl_ready') === '1');
   const [saving, setSaving] = useState(false);
   const [nearbyCapsules, setNearbyCapsules] = useState([]);
   const [lastScan, setLastScan] = useState(null);
@@ -132,7 +132,7 @@ export default function App() {
       resolved = true;
 
       if (event === 'SIGNED_OUT') {
-        sessionStorage.removeItem('xportl_ready');
+        localStorage.removeItem('xportl_ready');
         setSession(null);
         setProfile(null);
         setBlocked(null);
@@ -268,7 +268,7 @@ export default function App() {
 
   const markReady = () => {
     if (!ready) {
-      sessionStorage.setItem('xportl_ready', '1');
+      localStorage.setItem('xportl_ready', '1');
       setReady(true);
     }
   };
@@ -553,7 +553,7 @@ export default function App() {
   }
 
   // Gates 3-6: ONLY shown if not yet in AR mode (ready=false).
-  // Once ready=true (persisted in sessionStorage), these are PERMANENTLY skipped.
+  // Once ready=true (persisted in localStorage), these are PERMANENTLY skipped.
   // This eliminates ALL "open-close-reopen" bugs caused by state fluctuation.
   if (!ready) {
     if (blocked) {
