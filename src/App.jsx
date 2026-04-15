@@ -339,39 +339,38 @@ export default function App() {
 
     const body = (message && message.trim()) || 'Estive aqui!';
 
-    // Rate limit check
-    const rateCheck = await checkRateLimit(session.user.id, 'create_capsule');
-    if (!rateCheck.allowed) {
-      alert(rateCheck.retryAfter);
-      return;
-    }
+    // Helper: run a check with a timeout so a broken RPC never freezes the app
+    const safeCheck = (fn, fallback, timeoutMs = 5000) =>
+      Promise.race([fn(), new Promise((r) => setTimeout(() => r(fallback), timeoutMs))]);
 
-    // Geofence check
-    const zone = await checkRestrictedZone(geo.lat, geo.lng);
-    if (zone) {
-      alert(`Zona restrita (${zone.zone_name}). Capsulas nao podem ser criadas neste local.`);
-      return;
-    }
+    // Rate limit check (fail-open on timeout)
+    try {
+      const rateCheck = await safeCheck(
+        () => checkRateLimit(session.user.id, 'create_capsule'),
+        { allowed: true }
+      );
+      if (!rateCheck.allowed) { alert(rateCheck.retryAfter); return; }
+    } catch (e) { console.warn('[XPortl] Rate limit check failed, allowing:', e); }
 
-    // ECA: minor restrictions
+    // Geofence check (fail-open on timeout)
+    try {
+      const zone = await safeCheck(
+        () => checkRestrictedZone(geo.lat, geo.lng),
+        null
+      );
+      if (zone) { alert(`Zona restrita (${zone.zone_name}). Capsulas nao podem ser criadas neste local.`); return; }
+    } catch (e) { console.warn('[XPortl] Geofence check failed, allowing:', e); }
+
+    // ECA: minor restrictions (local check, no network)
     const minorRules = getMinorRestrictions(profile);
     if (minorRules) {
-      if (minorRules.noMedia && mediaBlob) {
-        alert('Conta de menor: envio de midia nao permitido (ECA).');
-        return;
-      }
-      if (minorRules.noGhost && visibilityLayer === 'ghost') {
-        alert('Conta de menor: capsulas Ghost nao permitidas (ECA).');
-        return;
-      }
+      if (minorRules.noMedia && mediaBlob) { alert('Conta de menor: envio de midia nao permitido (ECA).'); return; }
+      if (minorRules.noGhost && visibilityLayer === 'ghost') { alert('Conta de menor: capsulas Ghost nao permitidas (ECA).'); return; }
     }
 
-    // Content validation
+    // Content validation (local check, no network)
     const contentCheck = validateContent(body);
-    if (!contentCheck.allowed) {
-      alert(contentCheck.reason);
-      return;
-    }
+    if (!contentCheck.allowed) { alert(contentCheck.reason); return; }
 
     setSaving(true);
     try {
@@ -400,23 +399,20 @@ export default function App() {
         created_by: session.user.id,
       });
 
-      // Log access (Marco Civil Art. 15)
-      logAccess({
-        userId: session.user.id,
-        action: 'create_capsule',
-        lat: geo.lat,
-        lng: geo.lng,
-      });
+      // Log access (Marco Civil Art. 15) — fire-and-forget
+      logAccess({ userId: session.user.id, action: 'create_capsule', lat: geo.lat, lng: geo.lng }).catch(() => {});
 
-      // Award XP
-      const xpAction = visibilityLayer === 'ghost' ? 'create_ghost' : (mediaBlob ? 'create_media' : 'create_capsule');
-      const xpResult = await awardXP(session.user.id, xpAction);
-      if (xpResult) setXpEvent(xpResult);
-
-      // Check first capsule badge
-      tryGrantBadge(session.user.id, 'first_portal').catch(() => {});
-      if (unlockDate) tryGrantBadge(session.user.id, 'time_lord').catch(() => {});
-      if (mediaBlob) tryGrantBadge(session.user.id, 'media_creator').catch(() => {});
+      // Award XP (non-blocking — capsule is already saved, don't let XP failure break the flow)
+      try {
+        const xpAction = visibilityLayer === 'ghost' ? 'create_ghost' : (mediaBlob ? 'create_media' : 'create_capsule');
+        const xpResult = await awardXP(session.user.id, xpAction);
+        if (xpResult) setXpEvent(xpResult);
+        tryGrantBadge(session.user.id, 'first_portal').catch(() => {});
+        if (unlockDate) tryGrantBadge(session.user.id, 'time_lord').catch(() => {});
+        if (mediaBlob) tryGrantBadge(session.user.id, 'media_creator').catch(() => {});
+      } catch (xpErr) {
+        console.warn('[XPortl] XP award failed (capsule was saved):', xpErr);
+      }
 
       scanVersion.current += 1;
       const results = await getNearbyCapsules(geo.lat, geo.lng, SCAN_RADIUS);
