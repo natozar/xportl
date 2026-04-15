@@ -116,8 +116,12 @@ export default function MapView({ lat, lng, capsules, onSelectCapsule }) {
 
     return () => {
       cancelled = true;
-      if (mapRef.current) {
-        mapRef.current.remove();
+      try {
+        if (mapRef.current) {
+          mapRef.current.remove();
+          mapRef.current = null;
+        }
+      } catch (_) {
         mapRef.current = null;
       }
     };

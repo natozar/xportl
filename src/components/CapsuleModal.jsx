@@ -25,10 +25,19 @@ export default function CapsuleModal({ capsule, onClose, onSelfDestruct, onRepor
     if (locked || consumedRef.current) return;
     consumedRef.current = true;
 
-    (async () => {
-      const result = await consumeView(capsule.id);
-      setViewsLeft(result.views_left);
-    })();
+    // Skip DB operations on synthetic IDs (fallback-created capsules)
+    const isSyntheticId = capsule.id?.startsWith('created_') || capsule.id?.startsWith('local_');
+
+    if (!isSyntheticId) {
+      (async () => {
+        try {
+          const result = await consumeView(capsule.id);
+          setViewsLeft(result.views_left);
+        } catch (_) {
+          setViewsLeft(null);
+        }
+      })();
+    }
 
     haptic(locked ? [200, 100, 200] : [100, 50, 100]);
 

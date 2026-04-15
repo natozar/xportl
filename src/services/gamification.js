@@ -34,8 +34,9 @@ export function xpProgress(totalXp) {
   const level = calculateLevel(totalXp);
   const currentLevelXp = xpForLevel(level);
   const nextLevelXp = xpForLevel(level + 1);
-  const progress = (totalXp - currentLevelXp) / (nextLevelXp - currentLevelXp);
-  return { level, progress: Math.min(1, Math.max(0, progress)), xpToNext: nextLevelXp - totalXp };
+  const range = nextLevelXp - currentLevelXp;
+  const progress = range > 0 ? (totalXp - currentLevelXp) / range : 0;
+  return { level, progress: Math.min(1, Math.max(0, progress)), xpToNext: Math.max(0, nextLevelXp - totalXp) };
 }
 
 // ── Badges ──
