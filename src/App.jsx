@@ -599,7 +599,7 @@ export default function App() {
     setShowSettings(false);
     if (tab === 'create') {
       setActiveTab('explore');
-      setShowCreatePost(true);
+      window.dispatchEvent(new CustomEvent('xportl:open-create'));
     } else {
       setActiveTab(tab);
     }
@@ -635,6 +635,7 @@ export default function App() {
 
           <div style={styles.overlay}>
             <Radar lat={geo.lat} lng={geo.lng} altitude={geo.altitude} nearbyCount={nearbyCapsules.length} />
+            <LeaveTraceButton onPress={handleLeaveTrace} saving={saving} />
             <VibePing onPing={handleVibePing} />
           </div>
         </>
@@ -706,17 +707,7 @@ export default function App() {
         <PortalAnimation onComplete={() => setShowPortalAnimation(false)} />
       )}
 
-      {/* Create Post (fullscreen, above everything) */}
-      {showCreatePost && (
-        <CreatePost
-          saving={saving}
-          onClose={() => setShowCreatePost(false)}
-          onPost={async (data) => {
-            await handleLeaveTrace(data);
-            setShowCreatePost(false);
-          }}
-        />
-      )}
+      {/* CreatePost disabled — using LeaveTraceButton FAB instead */}
 
       {/* XP notification toast */}
       <XPToast event={xpEvent} onDone={() => setXpEvent(null)} />
