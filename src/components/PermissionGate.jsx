@@ -4,16 +4,20 @@ export default function PermissionGate({ geo, cam, onComplete }) {
   const [step, setStep] = useState('welcome');
   const [statusText, setStatusText] = useState('');
   const completedRef = useRef(false);
+  const onCompleteRef = useRef(onComplete);
+  onCompleteRef.current = onComplete;
 
   // As soon as both permissions are granted, call onComplete ONCE
+  // Using ref to avoid re-triggering when onComplete reference changes
   useEffect(() => {
     if (geo.granted && cam.granted && !completedRef.current) {
       completedRef.current = true;
-      // Small delay so the user sees "ABRINDO PORTAL..." feedback
-      const t = setTimeout(() => onComplete(), 400);
+      console.log('[XPortl] Permissions granted — opening portal');
+      // Tiny delay for visual feedback, then transition
+      const t = setTimeout(() => onCompleteRef.current(), 300);
       return () => clearTimeout(t);
     }
-  }, [geo.granted, cam.granted, onComplete]);
+  }, [geo.granted, cam.granted]);
 
   const handleEnter = async () => {
     setStep('requesting');

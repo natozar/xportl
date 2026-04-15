@@ -41,17 +41,41 @@ import Leaderboard from './components/Leaderboard';
 const SCAN_INTERVAL = 30_000;
 const SCAN_RADIUS = 50;
 
-// Offset planted capsules ~6m from the user in a random bearing so the AR
-// entity doesn't render at distance zero (invisible, colocated with the
-// camera). Multiple capsules planted at the same spot spread in a small
-// circle around the user.
-const PLANT_OFFSET_METERS = 1.5;
-function offsetCoord(lat, lng) {
-  const bearing = Math.random() * 2 * Math.PI;
-  const dLat = (PLANT_OFFSET_METERS * Math.cos(bearing)) / 111320;
-  const dLng =
-    (PLANT_OFFSET_METERS * Math.sin(bearing)) /
-    (111320 * Math.cos((lat * Math.PI) / 180));
+// ── Smart capsule placement ──
+// Uses device compass to place the capsule WHERE THE USER IS LOOKING,
+// not at a random bearing. Falls back to random if compass unavailable.
+// Distance adapts to GPS accuracy: high accuracy = closer, low = farther.
+
+let _lastHeading = null;
+
+// Listen for device orientation to get compass heading
+if (typeof window !== 'undefined') {
+  const headingHandler = (e) => {
+    // webkitCompassHeading (iOS) or alpha (Android)
+    _lastHeading = e.webkitCompassHeading ?? (e.alpha !== null ? (360 - e.alpha) % 360 : null);
+  };
+  window.addEventListener('deviceorientationabsolute', headingHandler, true);
+  window.addEventListener('deviceorientation', headingHandler, true);
+}
+
+function smartPlaceCoord(lat, lng, accuracy) {
+  // Distance: based on GPS accuracy, clamped between 2m and 5m
+  // High accuracy (±3m) → place at 2m
+  // Low accuracy (±20m) → place at 5m
+  const dist = Math.max(2, Math.min(5, (accuracy || 10) * 0.3));
+
+  // Direction: use compass heading (where user is pointing the phone)
+  // Fall back to random if compass not available
+  const headingDeg = _lastHeading;
+  const bearing = headingDeg !== null
+    ? (headingDeg * Math.PI) / 180
+    : Math.random() * 2 * Math.PI;
+
+  const dLat = (dist * Math.cos(bearing)) / 111320;
+  const dLng = (dist * Math.sin(bearing)) / (111320 * Math.cos((lat * Math.PI) / 180));
+
+  console.log(`[XPortl Place] dist=${dist.toFixed(1)}m heading=${headingDeg !== null ? headingDeg.toFixed(0) + '°' : 'random'} accuracy=±${(accuracy || 0).toFixed(0)}m`);
+
   return { lat: lat + dLat, lng: lng + dLng };
 }
 
@@ -384,7 +408,7 @@ export default function App() {
         mediaTypeField = mediaType;
       }
 
-      const plant = offsetCoord(geo.lat, geo.lng);
+      const plant = smartPlaceCoord(geo.lat, geo.lng, geo.accuracy);
       await createCapsule({
         lat: plant.lat,
         lng: plant.lng,
