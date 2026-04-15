@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 
 export function useCamera() {
   const [state, setState] = useState({
@@ -55,6 +55,23 @@ export function useCamera() {
       });
     }
   }, []);
+
+  // Auto-release the permission-check stream after 3s so it doesn't
+  // conflict with AR.js acquiring the camera. The delay gives AR.js
+  // time to mount and request its own getUserMedia.
+  useEffect(() => {
+    if (state.granted && state.stream) {
+      const t = setTimeout(() => {
+        setState((s) => {
+          if (s.stream) {
+            s.stream.getTracks().forEach((track) => track.stop());
+          }
+          return { ...s, stream: null };
+        });
+      }, 3000);
+      return () => clearTimeout(t);
+    }
+  }, [state.granted, state.stream]);
 
   const release = useCallback(() => {
     setState((s) => {

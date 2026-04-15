@@ -234,10 +234,9 @@ export default function App() {
     && hasAcceptedTos(profile) && hasAcceptedLocationDisclaimer(profile);
 
   useEffect(() => {
+    console.log('[XPortl Gate]', { permissionsGranted, legalGatesCleared, ready, geoGranted: geo.granted, camGranted: cam.granted, hasProfile: !!profile, showTos, showDisclaimer, blocked: !!blocked });
     if (permissionsGranted && legalGatesCleared && !ready) {
-      // Release our preview stream immediately so AR.js can grab the camera
-      cam.release();
-      // Mount AR scene instantly — no artificial delay
+      console.log('[XPortl Gate] ALL CLEAR — mounting AR');
       setReady(true);
     }
   }, [permissionsGranted, legalGatesCleared, ready]);
