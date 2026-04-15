@@ -421,7 +421,7 @@ export default function App() {
       const msg = err?.message || err?.error_description || JSON.stringify(err);
       console.error('[XPortl] Failed to create capsule:', msg, err);
 
-      // Log to error_events for godmode visibility
+      // Log to error_events for godmode visibility — include full context
       supabase.from('error_events').insert({
         source: 'client',
         user_id: session.user.id,
@@ -431,6 +431,18 @@ export default function App() {
         error_message: msg,
         error_stack: err?.stack || null,
         severity: 'error',
+        metadata: {
+          lat: geo.lat,
+          lng: geo.lng,
+          visibility_layer: visibilityLayer || 'public',
+          has_media: !!mediaBlob,
+          media_type: mediaType || null,
+          has_unlock: !!unlockDate,
+          error_code: err?.code || null,
+          error_details: err?.details || null,
+          error_hint: err?.hint || null,
+          supabase_status: err?.status || null,
+        },
       }).then(() => {}).catch(() => {});
 
       alert('Falha ao criar capsula:\n' + msg);
