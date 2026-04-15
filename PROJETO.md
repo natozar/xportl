@@ -275,6 +275,17 @@ direcionais independente da precisao do GPS. Offset reduzido para 0.3m.
 **Licao:** GPS nao e confiavel para posicionamento preciso. Sempre ter fallback
 visual baseado em compass/bearing.
 
+### Bug: Clicar na capsula nao abre nada (modal invisivel)
+**Sintoma:** Capsula aparecia no NearbyOverlay, usuario tocava, nada acontecia.
+**Causa:** CapsuleModal tinha z-index:100. O overlay de UI (NearbyOverlay,
+Radar, FAB) tinha z-index:9999. O modal renderizava mas ficava ATRAS de tudo.
+**Fix:** Todos os modais (CapsuleModal, VortexModal, Leaderboard, ReportModal)
+subidos para z-index:10000.
+**Licao:** Ao subir z-index de overlays de UI, SEMPRE verificar se modais que
+abrem por cima tambem foram atualizados. Manter hierarquia documentada:
+  0 = AR canvas | 5 = scanlines | 9998 = NearbyOverlay | 9999 = UI overlay
+  10000 = modais | 10001 = XP toast
+
 ### Bug: Botoes da camera nao funcionam no Android
 **Sintoma:** Shutter, flip, mode buttons nao respondiam ao toque.
 **Causa:** O elemento <video> (position:absolute inset:0) interceptava todos
@@ -381,6 +392,8 @@ para /app, nunca chama signOut. A sessao e compartilhada, o acesso e separado.
 ## 10. COMMITS (HISTORICO COMPLETO)
 
 ```
+1af5408  Fix capsule modal invisible on tap: z-index below UI overlay
+7187a7a  Complete rewrite of PROJETO.md with full project memory
 3880080  DEFINITIVE fix: single-click portal + exact GPS placement
 aa2ee07  Add compass-based NearbyOverlay — capsules ALWAYS visible now
 80404d6  Smart capsule placement + definitive single-click portal fix
