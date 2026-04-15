@@ -1,13 +1,15 @@
-# XPORTL — Documento de Contexto e Roadmap
+# XPORTL — Contexto Completo do Projeto
 
-**Ultima atualizacao:** 14 de abril de 2026
+**Atualizado:** 14 de abril de 2026
 **Repo:** https://github.com/natozar/xportl
 **Deploy:** https://xportl.vercel.app
+**Godmode:** https://xportl.vercel.app/godmode
 **Supabase:** https://fjwxqgupupblfxbwvhio.supabase.co
+**Owner:** Renato Rodrigues (natozar)
 
 ---
 
-## VISAO DO PRODUTO
+## 1. VISAO DO PRODUTO
 
 Primeira rede social em realidade aumentada ancorada em coordenadas GPS reais.
 Usuarios plantam capsulas do tempo digitais (texto, foto, audio, video) em locais
@@ -16,211 +18,433 @@ atraves da camera do celular.
 
 **Tagline:** Deixe rastros. Encontre portais.
 
+**Diferencial:** Capsulas autodestrutivas (Ghost), trava temporal, deteccao
+espacial indoor (WebXR), gamificacao com XP/badges/leaderboard, moderacao
+automatica com IA client-side (NSFW filter).
+
 ---
 
-## ARQUITETURA ATUAL
+## 2. ARQUITETURA
 
 ```
-Landing (index.html)         App (app.html)              Godmode (godmode.html)
-   HTML puro                    React 19 + A-Frame           React (admin isolado)
-   SEO / marketing              AR.js Location-Based         Feature flags
-   OAuth redirect catch         Supabase Realtime            Kill switch / Audit
-        |                            |                            |
-        +------------ Vite Multi-Entry Build ---------+-----------+
-                                     |
-                              Vercel (deploy)
-                                     |
-                          Supabase (Sao Paulo)
-                          - PostgreSQL + PostGIS
-                          - Auth (Google, Email, Phone)
-                          - Storage (capsule-media bucket)
-                          - Realtime (postgres_changes)
+index.html (Landing Page)    app.html (React App)         godmode.html (Admin)
+   HTML puro / SEO               React 19 + A-Frame          React isolado
+   OAuth redirect catch          AR.js GPS + NearbyOverlay   Metricas + Errors
+        |                             |                           |
+        +------------ Vite Multi-Entry Build ----------+----------+
+                                      |
+                               Vercel (auto-deploy)
+                                      |
+                           Supabase (Sao Paulo)
+                           - PostgreSQL 15 + PostGIS 3.3
+                           - Auth (Google OAuth, Email, Phone/SMS)
+                           - Storage (capsule-media bucket, public)
+                           - Realtime (postgres_changes on capsules)
 ```
 
-### Stack
+### Stack Completa
 
 | Camada | Tecnologia |
 |--------|------------|
-| Frontend | React 19, A-Frame 1.3, AR.js, TensorFlow.js |
+| Frontend | React 19, A-Frame 1.3, AR.js, Leaflet, TensorFlow.js |
 | Build | Vite 6, vite-plugin-pwa, Workbox |
-| Backend | Supabase (PostgreSQL 15 + PostGIS + Auth + Storage) |
-| Deploy | Vercel (auto-deploy on push) |
+| Backend | Supabase (PostgreSQL 15 + PostGIS 3.3 + Auth + Storage + Realtime) |
+| Deploy | Vercel (auto-deploy on push to main) |
 | DNS | Namecheap (xportl.com) |
 | Moderacao | NSFW.js client-side + regex pt-BR + reports + auto-ban |
+| Gamificacao | XP system + 20 badges + leaderboard + streaks |
+
+### Variaveis de Ambiente
+
+```
+VITE_SUPABASE_URL=https://fjwxqgupupblfxbwvhio.supabase.co
+VITE_SUPABASE_ANON_KEY=eyJhbGci...(anon key)
+```
+
+Apenas 2 variaveis. Configuradas tambem na Vercel (Settings > Environment Variables).
 
 ---
 
-## FEATURES COMPLETAS (MVP)
+## 3. ESTRUTURA DE ARQUIVOS
 
-### Core
-- [x] Capsulas geolocalizadas em AR (A-Frame + GPS)
-- [x] 3 tipos: Perpetua, Ghost (autodestroi), Privada
-- [x] Trava temporal (unlock_date)
-- [x] Midia: foto, audio, video (upload para Supabase Storage)
-- [x] Clustering "Vortex" (3+ capsulas em 5m)
-- [x] Pings efemeros (emoji 15s)
-- [x] Realtime (postgres_changes + polling safety net)
-- [x] PWA instalavel (iOS instrucional + Android nativo)
-
-### Auth & Compliance
-- [x] Google OAuth + Email/senha + Telefone SMS
-- [x] Termos de Uso versionados (scroll-to-accept)
-- [x] Disclaimer de localizacao
-- [x] Vedacao ao anonimato (CF Art. 5, IV)
-- [x] Log de acesso (Marco Civil Art. 15)
-- [x] Geofencing de zonas restritas
-- [x] Rate limiting por acao
-- [x] Auto-moderacao (3 flags oculta, 5 remove, 3 removals suspende, 5 bane)
-- [x] NSFW filter client-side (TensorFlow.js MobileNet)
-- [x] Filtro de texto (palavroes, PII, ameacas)
-- [x] Sistema de denuncias com 10 categorias
-- [x] LGPD: export de dados + exclusao de conta
-
-### Admin (Godmode)
-- [x] Dashboard overview
-- [x] Feature flags editor
-- [x] Kill switch (IA desligada por padrao)
-- [x] Audit log (append-only, imutavel)
+```
+src/
+├── main.jsx                    # App entry: PWA registration, app shell fade
+├── App.jsx                     # State machine: auth → ToS → GPS → AR
+│
+├── components/
+│   ├── AuthGate.jsx            # Login (Google, email, phone SMS)
+│   ├── TosModal.jsx            # Termos de uso (scroll-to-accept)
+│   ├── LocationDisclaimer.jsx  # Disclaimer geolocalizado
+│   ├── PermissionGate.jsx      # GPS + Camera permission request
+│   ├── ARScene.jsx             # A-Frame: entidades 3D GPS-based
+│   ├── NearbyOverlay.jsx       # Compass-based markers (SEMPRE visivel)
+│   ├── MapView.jsx             # Mapa 2D (Leaflet dark tiles)
+│   ├── IndoorScene.jsx         # WebXR plane detection (indoor AR)
+│   ├── BottomNav.jsx           # 5 tabs: Explorar/Mapa/Indoor/Criar/Perfil
+│   ├── Radar.jsx               # Mini-radar com contagem
+│   ├── LeaveTraceButton.jsx    # Criacao de capsula (tipo + texto + midia)
+│   ├── CameraModal.jsx         # Captura foto/video fullscreen
+│   ├── CapsuleModal.jsx        # Visualizar capsula + ghost bar + audio
+│   ├── VortexModal.jsx         # Timeline de cluster (3+ capsulas)
+│   ├── VibePing.jsx            # Emoji efemero (15s)
+│   ├── ReportModal.jsx         # Denuncia (10 categorias)
+│   ├── InstallPrompt.jsx       # PWA install (iOS/Android dual-mode)
+│   ├── ProfilePage.jsx         # Avatar, nome, XP, badges, stats
+│   ├── SettingsPage.jsx        # Termos, LGPD, export, delete, logout
+│   ├── Leaderboard.jsx         # Top 50 por XP
+│   └── XPToast.jsx             # Notificacao de XP ganho
+│
+├── services/
+│   ├── supabase.js             # Client init (PKCE auth flow)
+│   ├── auth.js                 # OAuth, email, phone, profile, ToS
+│   ├── capsules.js             # CRUD + proximity queries + realtime
+│   ├── storage.js              # Upload/delete midia (capsule-media bucket)
+│   ├── clustering.js           # Vortex detection (3+ em 5m)
+│   ├── moderation.js           # Content filter, rate limit, geofence, reports
+│   ├── nsfwFilter.js           # TF.js NSFW classification (lazy-loaded)
+│   ├── gamification.js         # XP, levels, badges, streaks, leaderboard
+│   ├── pings.js                # Emoji efemeros (INSERT + auto-DELETE 15s)
+│   ├── share.js                # Links compartilhaveis (base64 token)
+│   ├── lgpd.js                 # Data export + account deletion
+│   └── spatialEngine.js        # WebXR plane detection + hit testing
+│
+├── hooks/
+│   ├── useGeolocation.js       # GPS watchPosition (retorna Promise)
+│   ├── useCamera.js            # Permission check only (libera stream imediatamente)
+│   ├── useMediaCapture.js      # Photo/audio/video + NSFW scan
+│   └── usePwaInstall.js        # beforeinstallprompt + iOS detection
+│
+├── aframe/
+│   └── registerComponents.js   # capsule-data, vortex-data, glitch-glow, ping-rise
+│
+├── godmode/
+│   ├── main.jsx / App.jsx      # Admin shell (hash routing, idle timeout)
+│   └── pages/
+│       ├── Overview.jsx        # Metricas reais + grafico de erros 24h
+│       ├── Errors.jsx          # Error events + AI diagnosis + Claude prompts
+│       ├── Flags.jsx           # Feature flags editor
+│       ├── KillSwitch.jsx      # IA safety controls
+│       └── Audit.jsx           # Log imutavel
+│
+└── styles/global.css           # Tema cyberpunk (violet + cyan + orange)
+```
 
 ---
 
-## TABELAS DO BANCO
+## 4. BANCO DE DADOS (12 tabelas, 17 funcoes, 5 triggers)
 
 | Tabela | Proposito | Migration |
 |--------|-----------|-----------|
-| capsules | Capsulas + pings + todo conteudo geo | schema.sql |
-| user_profiles | Perfil legal (extends auth.users) | migration_003 |
+| capsules | Capsulas + pings + conteudo geo (21 colunas) | schema.sql + migration_002-009 |
+| user_profiles | Perfil legal + XP + badges + streak | migration_003 + 010 |
 | access_logs | Logs Marco Civil Art. 15 | migration_003 |
-| reports | Denuncias / flags | migration_003 |
-| restricted_zones | Geofencing PostGIS | migration_003 |
+| reports | Denuncias (10 categorias) | migration_003 |
+| restricted_zones | Geofencing PostGIS (location GENERATED) | migration_003 |
 | rate_limits | Limites por usuario/acao | migration_003 |
-| admin_users | Roster de admins | migration_004 |
-| admin_credentials | WebAuthn passkeys | migration_004 |
-| audit_log | Log imutavel de acoes admin | migration_004 |
-| error_events | Ingestao de erros client/server | migration_004 |
-| feature_flags | Kill switches + config runtime | migration_004 |
+| admin_users | Roster de admins (owner/moderator/observer) | migration_004 |
+| admin_credentials | WebAuthn passkeys (schema pronto, UI pendente) | migration_004 |
+| audit_log | Append-only, imutavel (triggers bloqueiam UPDATE/DELETE) | migration_004 |
+| error_events | Ingestao de erros client/server + AI classification | migration_004 |
+| feature_flags | Kill switches + config runtime (6 flags default) | migration_004 |
+| xp_events | Ledger de XP (append-only) | migration_010 |
+
+### Storage Bucket
+- **capsule-media** (Public, 10MB limit)
+- Policies: INSERT/SELECT/DELETE para bucket_id = 'capsule-media'
+
+### Extensions
+- postgis 3.3.7
+- uuid-ossp 1.1
 
 ---
 
-## VARIAVEIS DE AMBIENTE
+## 5. FLUXO DO USUARIO
 
 ```
-VITE_SUPABASE_URL=https://xxxxx.supabase.co
-VITE_SUPABASE_ANON_KEY=eyJhbGci...
-```
-
-Apenas 2 variaveis. Configurar tambem na Vercel (Environment Variables).
-
----
-
-## FLUXO DO USUARIO
-
-```
-1. Landing page (index.html) → "Abrir app"
-2. AuthGate → Google / Email / Telefone
-3. TosModal → Aceitar termos (scroll obrigatorio)
-4. LocationDisclaimer → Aceitar responsabilidade
-5. PermissionGate → Camera + GPS
-6. AR View → Camera ao vivo + capsulas 3D flutuando
-7. Criar capsula → Tipo + mensagem + midia + trava temporal
-8. Descobrir capsulas → Tocar no 3D → modal com conteudo
-9. Denunciar → ReportModal → auto-moderacao
+1. Landing page (index.html) → CTA "Abrir app" → /app
+2. AuthGate → Google OAuth / Email+senha / Telefone+SMS
+3. Email verification (so para signup por email)
+4. TosModal → Scroll ate o final → aceitar v1.0.0
+5. LocationDisclaimer → Aceitar responsabilidade
+6. PermissionGate → Camera + GPS (1 clique, ambos em paralelo)
+7. AR View → Camera ao vivo + NearbyOverlay + A-Frame 3D
+8. BottomNav → Explorar / Mapa / Indoor / Criar / Perfil
+9. Criar capsula → Tipo + mensagem + midia + trava temporal
+10. Descobrir → NearbyOverlay markers / AR 3D / Mapa pins
+11. Gamificacao → XP + badges + leaderboard
 ```
 
 ---
 
-## PROXIMAS ETAPAS (PRIORIDADE)
+## 6. FEATURES COMPLETAS
 
-### P0 — Bugs Criticos (RESOLVIDOS)
+### Core AR
+- [x] Capsulas geolocalizadas (A-Frame + AR.js GPS)
+- [x] NearbyOverlay: markers compass-based (sempre visiveis, independente do GPS)
+- [x] Smart placement: 0.3m offset na direcao do compass
+- [x] 3 tipos: Perpetua, Ghost (autodestroi), Privada
+- [x] Trava temporal (unlock_date)
+- [x] Clustering "Vortex" (3+ capsulas em 5m)
+- [x] Pings efemeros (emoji 15s)
+- [x] Indoor AR (WebXR plane detection — Chrome/ARCore, Safari/LiDAR)
 
-- [x] **Shadowban filtrado na leitura**: migration_008 atualiza RPC com
-  LEFT JOIN user_profiles. Capsulas de shadowbanned sao invisiveis exceto
-  para o proprio autor. Client fallback tambem filtra moderation_status.
+### Midia
+- [x] Captura de foto (rear + selfie, NSFW scan antes do upload)
+- [x] Gravacao de video (15s max, 5MB cap)
+- [x] Gravacao de audio (30s max)
+- [x] Player customizado (audio waveform, video inline)
+- [x] Audio espacial (A-Frame sound, distance-based)
 
-- [x] **Email verificado obrigatorio**: App.jsx checa email_confirmed_at
-  para signups por email. OAuth (Google) ignora (sempre verificado).
-  Tela "confirme seu e-mail" bloqueia acesso ate confirmacao.
+### Navegacao
+- [x] BottomNav: 5 tabs (Explorar / Mapa / Indoor / Criar / Perfil)
+- [x] Mapa 2D (Leaflet, CartoDB dark tiles, markers SVG, raio 50m)
+- [x] Perfil (avatar upload, nome editavel, XP bar, badges, stats)
+- [x] Settings (Termos, Privacidade, LGPD export/delete, logout)
+- [x] Compartilhamento de capsulas (native share + clipboard fallback)
 
-- [x] **Geofence server-side**: migration_009 adiciona BEFORE INSERT trigger
-  que valida coordenadas contra restricted_zones. API direta bloqueada.
+### Gamificacao
+- [x] XP: create=25, ghost=40, media=35, discover=15, view=5
+- [x] 20 badges (milestones, especiais, streaks, social, niveis)
+- [x] Niveis: formula sqrt(xp/50)+1 (Novato → Oraculo)
+- [x] Streaks diarios (3d/7d/30d com badges + XP bonus)
+- [x] Leaderboard top 50
+- [x] XP toast animado + level-up celebration
 
-### P1 — Qualidade (RESOLVIDOS)
+### Auth & Compliance
+- [x] Google OAuth + Email/senha + Telefone SMS
+- [x] Termos de Uso v1.0.0 (scroll obrigatorio)
+- [x] Disclaimer de localizacao
+- [x] Vedacao ao anonimato (CF Art. 5, IV)
+- [x] Logs de acesso (Marco Civil Art. 15)
+- [x] Geofencing server-side (trigger BEFORE INSERT)
+- [x] Rate limiting configuravel (feature_flags)
+- [x] Auto-moderacao (3 flags→oculta, 5→remove, 3 removals→suspende, 5→bane)
+- [x] NSFW filter client-side (TensorFlow.js MobileNet, lazy-loaded)
+- [x] Filtro de texto expandido (racismo, homofobia, ameacas, assedio, PII)
+- [x] Sistema de denuncias (10 categorias)
+- [x] LGPD: export JSON + exclusao com retencao Marco Civil
+- [x] Restricoes de menores (ECA): sem midia, sem ghost, max 5/dia
+- [x] Email verification gate (so para signup por email)
 
-- [x] **Texto customizado**: Ja estava unificado — App.jsx usa `message`
-  do LeaveTraceButton com fallback 'Estive aqui!' so se vazio.
+### Admin (Godmode)
+- [x] Overview: metricas reais (users, capsulas, erros, denuncias)
+- [x] Grafico SVG: erros por hora (24h) + top errors por tipo
+- [x] Errors page: diagnostico IA + prompts copiáveis para Claude Code
+- [x] Feature flags editor
+- [x] Kill switch (IA desligada por padrao)
+- [x] Audit log (append-only, imutavel)
+- [x] Session separada do app (godmode nunca faz signOut)
+- [x] Idle timeout 15min (lock local, sem logout)
 
-- [x] **Restricoes de menores (ECA)**: getMinorRestrictions() agora chamada
-  antes de criar capsula. Bloqueia midia e ghost para is_minor.
-
-- [x] **Rate limits configuraveis**: checkRateLimit() le feature_flags
-  (key: rate_limits) com cache 5min. Fallback para defaults hardcoded.
-
-- [ ] **Passkey enrollment no Godmode**: Schema de WebAuthn pronto, falta UI
-  para registrar credenciais e verificar no login do admin.
-
-### P2 — Growth (futuro proximo)
-
-- [ ] **Compartilhamento de capsulas privadas**: Gerar link/QR code com
-  coordenadas criptografadas. Quem recebe o link ve a capsula no mapa.
-
-- [ ] **Perfil publico**: Pagina com capsulas do usuario, stats, badge de nivel.
-
-- [ ] **Notificacoes push**: Quando alguem abre sua capsula ou quando uma
-  capsula ghost esta prestes a expirar.
-
-- [ ] **Gamificacao**: XP por criar/descobrir capsulas, niveis, badges,
-  leaderboard por regiao.
-
-- [ ] **Mapa 2D**: Visao alternativa (tipo Google Maps) mostrando capsulas
-  como pins. Util para planejar rotas antes de sair.
-
-### P3 — Escala (medio prazo)
-
-- [ ] **Edge Functions**: Mover validacoes criticas (geofence, rate limit,
-  content filter) para Supabase Edge Functions (server-side).
-
-- [ ] **CDN para midia**: Cloudflare R2 ou similar para servir fotos/videos
-  com cache global.
-
-- [ ] **Analytics**: Mixpanel ou PostHog para metricas de retencao,
-  capsulas criadas/abertas por dia, DAU/MAU.
-
-- [ ] **Moderacao com IA**: Usar LLM para classificar denuncias automaticamente.
-  Infraestrutura de kill switch ja esta pronta (feature_flags).
-
-- [ ] **Internacionalizacao (i18n)**: App em portugues hardcoded. Preparar
-  para ingles/espanhol.
+### PWA
+- [x] Service Worker (Workbox, auto-update, skip-waiting)
+- [x] Install prompt (Android nativo + iOS instrucional)
+- [x] Manifest completo (standalone, portrait, categories)
+- [x] Offline fallback (app.html)
+- [x] CDN caching (A-Frame 30d, Supabase media 3d)
 
 ---
 
-## DOCUMENTOS LEGAIS
+## 7. BUGS RESOLVIDOS (HISTORICO — APRENDER COM ELES)
+
+### Bug: OAuth login loop
+**Sintoma:** Login Google voltava pra tela de login infinitamente.
+**Causa:** getSession() rodava antes do Supabase processar o #access_token hash.
+**Fix:** Usar onAuthStateChange como unica fonte de verdade + poll getSession()
+quando hash tokens detectados na URL.
+**Licao:** NUNCA chamar getSession() e onAuthStateChange em paralelo.
+
+### Bug: Duplo clique para abrir portal (RECORRENTE — 5 tentativas de fix)
+**Sintoma:** Precisava clicar 2x no "Abrir Portal" para a camera abrir.
+**Causa real (final):** useCamera mantinha stream vivo que auto-release causava
+re-render → TOKEN_REFRESHED resetava profile → legalGatesCleared flickava →
+AR desmontava e remontava.
+**Fix definitivo:** (1) Camera para stream IMEDIATAMENTE apos checar permissao.
+(2) Profile NUNCA e nulled quando ready=true. (3) PermissionGate chama
+onComplete via ref estavel (nao inline function). (4) ready=true e permanente.
+**Licao:** Qualquer setState apos a transicao para AR pode causar re-render que
+desmonta a cena. Estados "pos-transicao" devem ser IMUTAVEIS.
+
+### Bug: Capsulas nao aparecem no AR
+**Sintoma:** Capsula criada com sucesso mas invisivel na camera.
+**Causa:** AR.js GPS-based posiciona entidades com precisao do GPS (±5-20m em
+areas urbanas). A capsula existia mas flutuava no terreno vizinho.
+**Fix:** Criado NearbyOverlay (compass-based) que SEMPRE mostra markers
+direcionais independente da precisao do GPS. Offset reduzido para 0.3m.
+**Licao:** GPS nao e confiavel para posicionamento preciso. Sempre ter fallback
+visual baseado em compass/bearing.
+
+### Bug: Botoes da camera nao funcionam no Android
+**Sintoma:** Shutter, flip, mode buttons nao respondiam ao toque.
+**Causa:** O elemento <video> (position:absolute inset:0) interceptava todos
+os touch events antes dos botoes renderizados "em cima".
+**Fix:** pointerEvents:'none' no video, pointerEvents:'auto' + touchAction:
+'manipulation' em cada botao.
+**Licao:** Em mobile, SEMPRE verificar que elementos fullscreen nao roubam
+touch events. Video/canvas = pointerEvents:none.
+
+### Bug: Mapa 2D quebrado (tela vazia)
+**Sintoma:** Tab Mapa nao renderizava tiles nem markers.
+**Causa:** CSP (Content Security Policy) bloqueava Leaflet CSS de unpkg.com e
+tiles de basemaps.cartocdn.com.
+**Fix:** Adicionado unpkg.com ao style-src e cartocdn.com/openstreetmap.org ao
+img-src no CSP.
+**Licao:** Ao adicionar dependencias que carregam recursos externos, SEMPRE
+atualizar o CSP.
+
+### Bug: Godmode carregava o app
+**Sintoma:** /godmode mostrava "Abrir Portal" em vez do painel admin.
+**Causa:** Service Worker navigateFallback='/app.html' interceptava /godmode.
+**Fix:** Adicionado /^\/godmode/ ao navigateFallbackDenylist no workbox config.
+**Licao:** Service Workers interceptam TODAS as rotas de navegacao. Rotas fora
+do SPA principal DEVEM estar na denylist.
+
+### Bug: "column rz.location does not exist"
+**Sintoma:** INSERT em capsules falhava com erro de coluna.
+**Causa:** A coluna location (GENERATED ALWAYS) na tabela restricted_zones nao
+foi criada porque PostGIS nao estava ativo quando a migration rodou.
+**Fix:** ALTER TABLE ADD COLUMN IF NOT EXISTS location GEOGRAPHY(POINT, 4326) GENERATED ALWAYS AS (ST_SetSRID(ST_MakePoint(lng, lat), 4326)::geography) STORED.
+**Licao:** Colunas GENERATED que dependem de extensoes (PostGIS) podem falhar
+silenciosamente. Sempre verificar com SELECT column_name apos migration.
+
+### Bug: Capsule creation freezing ("Ancorando..." infinito)
+**Sintoma:** App travava em "Ancorando nas coordenadas..." sem feedback.
+**Causa:** RPCs de compliance (checkRateLimit, checkRestrictedZone) podiam
+travar se a funcao SQL nao existia ou a rede caia.
+**Fix:** safeCheck() wrapper que races cada RPC contra timeout de 5s. Fail-open.
+XP/badges/logAccess rodando com .catch(() => {}).
+**Licao:** NUNCA depender de RPC para fluxo principal sem timeout. Fail-open
+para checks nao-criticos.
+
+---
+
+## 8. PROXIMAS ETAPAS
+
+### Pendente — Quality
+- [ ] Passkey enrollment no Godmode (schema pronto, falta UI)
+- [ ] Teste end-to-end no iPhone Safari (PWA + AR + camera)
+- [ ] Teste offline mode (capsulas em queue local)
+
+### Pendente — Growth
+- [ ] Notificacoes push (alguem abriu sua capsula)
+- [ ] Perfil publico (pagina com capsulas do usuario)
+- [ ] Deep linking melhorado (compartilhar com preview OG)
+
+### Pendente — Escala
+- [ ] Edge Functions (validacoes server-side)
+- [ ] CDN para midia (Cloudflare R2)
+- [ ] Analytics (PostHog ou Mixpanel)
+- [ ] Moderacao com LLM (classificar denuncias)
+- [ ] i18n (ingles/espanhol)
+
+### Pendente — Inovacao
+- [ ] Melhorar Indoor AR com mesh rendering (Three.js)
+- [ ] Audio espacial reativo (som muda com proximidade)
+- [ ] Capsulas em grupo (escape rooms multiplayer)
+- [ ] AR Cloud persistence (capsulas ancoradas em features visuais)
+
+---
+
+## 9. DECISOES TECNICAS IMPORTANTES
+
+### Por que NearbyOverlay em vez de so AR.js?
+AR.js GPS-based depende de precisao GPS (±5-20m em cidades). Em ambientes
+indoor ou urbanos densos, as entidades 3D ficam invisiveis porque estao
+posicionadas metros de onde deveriam. NearbyOverlay usa compass/bearing para
+mostrar DIRECAO, nao posicao absoluta. Funciona em qualquer precisao de GPS.
+
+### Por que camera permission check libera stream imediatamente?
+Manter o stream vivo causava conflito com AR.js (ambos queriam o device lock
+da camera traseira). No iOS, dois consumers na mesma camera = NotReadableError.
+A solucao: pedir permissao, confirmar grant, PARAR o stream, deixar AR.js
+criar o proprio.
+
+### Por que ready=true e permanente?
+TOKEN_REFRESHED do Supabase auth causa setSession() que re-triggera loadProfile()
+que pode nullificar profile momentaneamente. Se ready dependesse de profile, o
+AR desmontaria e remontaria (causando o bug "abre e fecha"). Solucao: ready=true
+e um estado terminal — so SIGNED_OUT pode resetar.
+
+### Por que TensorFlow.js lazy-loaded?
+O chunk nsfw-ai tem 41MB. Se fosse carregado no boot, o app levaria 20s+ para
+abrir. Com lazy-load, so carrega quando o usuario abre o painel de criacao e
+tira uma foto. O boot fica em <2s.
+
+### Por que Godmode nao faz signOut?
+Godmode e app compartilham o mesmo Supabase client (mesmo localStorage).
+Se godmode faz signOut, mata a sessao do app. Solucao: godmode so NAVEGA
+para /app, nunca chama signOut. A sessao e compartilhada, o acesso e separado.
+
+---
+
+## 10. COMMITS (HISTORICO COMPLETO)
+
+```
+3880080  DEFINITIVE fix: single-click portal + exact GPS placement
+aa2ee07  Add compass-based NearbyOverlay — capsules ALWAYS visible now
+80404d6  Smart capsule placement + definitive single-click portal fix
+d084e61  Fix 3 runtime bugs found by audit
+462d8f0  Reduce capsule plant offset from 6m to 1.5m
+49fde6b  Fix Indoor tab showing black screen on unsupported devices
+2d55975  Fix map tab (CSP blocking tiles/CSS) + add scan logging
+f571299  Rebuild Godmode: real metrics, error charts, AI fix suggestions
+c180538  Fix godmode loading app instead of admin panel
+133af65  Fix double-click: PermissionGate now calls onComplete directly
+75a4ed6  Add Errors page to Godmode + rich error context logging
+10b4c87  Fix capsule creation: fallback insert-only if select fails on RLS
+b97eb1b  Separate godmode from app session lifecycle
+cc6020b  Fix camera restart loop: stop releasing stream before AR mounts
+f652846  Fix double-click to open: GPS now returns Promise, awaits both
+8a73423  Fix capsule creation freezing: add timeouts + fail-safe to all RPCs
+86b5d40  Add detailed error logging for capsule creation failures
+c59a9e4  Fix 15 mobile QA issues (5 critical + 7 medium + 3 low)
+2675ed2  Add gamification system (XP, levels, badges, leaderboard)
+194e7df  Add Indoor Spatial AR mode (WebXR plane detection + hit testing)
+a6d3c1d  Add 2D Map view with Leaflet
+293efba  Fix CameraModal: all buttons unresponsive on Android/iOS
+f8d7cb5  Add bottom navigation bar, profile page, and settings
+20b82c8  Add capsule sharing + update roadmap status
+49e1adf  Fix P0 bugs + P1 quality improvements (6 items)
+332828f  Add PROJETO.md
+ea85d19  Fix 4 critical mobile UX bugs
+5f498a4  fix: AR overlay buttons + iOS home gesture zone
+f4e6381  fix: AR scene readiness check
+19ddbaf  polish: camera modal + panel pass
+9393a4f  fix: camera robustness + brighter portal visual
+b113b45  fix: CameraModal release/restore AR.js camera
+66350d5  feat: fullscreen camera modal with live preview + 15s video
+6321639  feat: text message input, selfie camera
+0b832ae  fix: offset planted capsules + restore camera fallback
+263db4f  chore: rewrite migration_006 for full schema gap
+645d1ab  Add NSFW image filter (TensorFlow.js)
+6022875  Add legal documents: Terms of Use and Privacy Policy
+995017a  Update tagline: Deixe rastros. Encontre portais.
+79acd06  Remove Apple Sign In (requires $99/yr)
+839204b  Add PWA install prompt with iOS/Android dual-mode
+3352945  Implement full compliance shield (LGPD + Marco Civil + CF/88 + ECA)
+b1dd8a0  Rebranding to XPortl
+9e86aac  Initial commit - Xplore Core MVP
+```
+
+---
+
+## 11. DOCUMENTOS LEGAIS
 
 | Documento | Arquivo | Versao |
 |-----------|---------|--------|
 | Termos de Uso | TERMOS_DE_USO.md | 1.0.0 |
 | Politica de Privacidade | POLITICA_DE_PRIVACIDADE.md | 1.0.0 |
 
-Ambos referenciados no TosModal (aceite obrigatorio).
-
 ---
 
-## COMMITS RECENTES
+## 12. CONTATOS E ACESSOS
 
-```
-ea85d19  Fix 4 critical mobile UX bugs: camera, clicks, speed, z-index
-5f498a4  (varios commits do outro computador - LP, godmode, video, realtime)
-5a7e007  Fix OAuth loop: poll for session when hash tokens present
-832dc05  Fix OAuth redirect: fully dynamic URL
-76dca07  Fix Google OAuth login loop (4 bugs)
-43683d2  Add email+password and phone+SMS auth options
-645d1ab  Add NSFW image filter (TensorFlow.js)
-6022875  Add legal documents: Terms of Use and Privacy Policy
-995017a  Update tagline
-839204b  Add PWA install prompt with iOS/Android dual-mode
-3352945  Implement full compliance shield
-b1dd8a0  Rebranding to XPortl
-9e86aac  Initial commit - Xplore Core MVP
-```
+- **GitHub:** github.com/natozar/xportl (privado)
+- **Vercel:** xportl.vercel.app (auto-deploy on push)
+- **Supabase:** fjwxqgupupblfxbwvhio.supabase.co
+- **Google OAuth:** configurado no Google Cloud Console
+- **Supabase Auth Providers:** Google (ativo), Email (ativo), Phone (desativado — requer Twilio)
 
 ---
 
