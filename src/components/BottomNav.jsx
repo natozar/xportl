@@ -25,6 +25,18 @@ const TABS = [
     ),
   },
   {
+    id: 'indoor',
+    label: 'Indoor',
+    icon: (active) => (
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+        <path d="M4 8V4h4M20 8V4h-4M4 16v4h4M20 16v4h-4" stroke={active ? '#b44aff' : 'currentColor'} strokeWidth="1.5" strokeLinecap="round" />
+        <circle cx="12" cy="12" r="3" stroke={active ? '#b44aff' : 'currentColor'} strokeWidth="1.5"
+          fill={active ? 'rgba(180,74,255,0.15)' : 'none'} />
+        <path d="M12 5v2m0 10v2m-5-7h2m8 0h2" stroke={active ? '#b44aff' : 'currentColor'} strokeWidth="1" opacity="0.4" strokeLinecap="round" />
+      </svg>
+    ),
+  },
+  {
     id: 'create',
     label: 'Criar',
     icon: (active) => (

@@ -14,6 +14,7 @@ import ReportModal from './components/ReportModal';
 import InstallPrompt from './components/InstallPrompt';
 import BottomNav from './components/BottomNav';
 import MapView from './components/MapView';
+import IndoorScene from './components/IndoorScene';
 import ProfilePage from './components/ProfilePage';
 import SettingsPage from './components/SettingsPage';
 import { useGeolocation } from './hooks/useGeolocation';
@@ -550,6 +551,15 @@ export default function App() {
             <VibePing onPing={handleVibePing} />
           </div>
         </>
+      )}
+
+      {/* ── Tab: Indoor (WebXR Spatial) ── */}
+      {activeTab === 'indoor' && (
+        <IndoorScene
+          capsules={nearbyCapsules}
+          onCapsuleFound={(cap) => { setActiveTab('explore'); setSelectedCapsule(cap); }}
+          onClose={() => setActiveTab('explore')}
+        />
       )}
 
       {/* ── Tab: Map ── */}
