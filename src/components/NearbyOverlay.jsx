@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { isCapsuleLocked, isGhostCapsule } from '../services/capsules';
+import { isCapsuleLocked, isGhostCapsule, getRarity, getCapsuleType } from '../services/capsules';
 
 export default function NearbyOverlay({ capsules, userLat, userLng, onSelect }) {
   const [heading, setHeading] = useState(0);
@@ -57,18 +57,22 @@ export default function NearbyOverlay({ capsules, userLat, userLng, onSelect }) 
         const dist = cap.distance_meters || 0;
         const locked = isCapsuleLocked(cap);
         const ghost = isGhostCapsule(cap);
+        const rarity = getRarity(cap);
+        const cType = getCapsuleType(cap);
 
-        // Distribute vertically: closer capsules sit lower (more centered),
-        // farther ones higher. Stagger by index to avoid overlap.
-        const distBand = Math.min(dist / 500, 1); // 0=close, 1=far
-        const verticalBase = 30 + distBand * 25; // 30%-55% from top
-        const stagger = (idx % 5) * 8; // offset each by 8%
+        // Distribute vertically
+        const distBand = Math.min(dist / 500, 1);
+        const verticalBase = 30 + distBand * 25;
+        const stagger = (idx % 5) * 8;
         const screenY = verticalBase + stagger;
 
-        // Visual properties based on distance
+        // Visual properties — rarity affects size and color
         const closeness = Math.max(0, 1 - dist / 500);
-        const size = 40 + closeness * 16; // 40-56px (smaller, cleaner)
-        const baseColor = locked ? [180, 74, 255] : ghost ? [180, 74, 255] : [0, 240, 255];
+        const rarityBoost = rarity.scale - 1;
+        const size = (40 + closeness * 16) * (1 + rarityBoost * 0.3);
+        const hexToRgb = (hex) => [parseInt(hex.slice(1,3),16), parseInt(hex.slice(3,5),16), parseInt(hex.slice(5,7),16)];
+        const useRarityColor = rarity.key !== 'common';
+        const baseColor = useRarityColor ? hexToRgb(rarity.color) : locked ? [180, 74, 255] : ghost ? [180, 74, 255] : [0, 240, 255];
         const color = `rgb(${baseColor.join(',')})`;
         const glow = `rgba(${baseColor.join(',')}, ${0.2 + closeness * 0.2})`;
 
@@ -135,8 +139,13 @@ export default function NearbyOverlay({ capsules, userLat, userLng, onSelect }) 
             {/* Info label */}
             <div style={s.label}>
               <span style={{ ...s.labelType, color }}>
-                {locked ? '🔒' : ghost ? '👻' : '✦'} {locked ? 'Trancado' : cap.content?.body?.slice(0, 12) || 'Portal'}
+                {locked ? '🔒' : cType.icon} {locked ? 'Trancado' : cap.content?.body?.slice(0, 12) || 'Portal'}
               </span>
+              {rarity.key !== 'common' && (
+                <span style={{ fontSize: '0.45rem', color: rarity.color, fontWeight: 700, letterSpacing: '0.06em' }}>
+                  {rarity.icon} {rarity.label}
+                </span>
+              )}
               <span style={s.labelDist}>
                 {dist < 1 ? 'aqui' : dist < 1000 ? `${dist.toFixed(0)}m` : `${(dist / 1000).toFixed(1)}km`}
               </span>

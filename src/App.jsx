@@ -380,7 +380,7 @@ export default function App() {
   }, [ready, geo.lat, geo.lng]);
 
   // ── Leave Trace (with all compliance checks) ──
-  const handleLeaveTrace = useCallback(async ({ unlockDate, message, mediaBlob, mediaType, viewsLeft, visibilityLayer }) => {
+  const handleLeaveTrace = useCallback(async ({ unlockDate, message, mediaBlob, mediaType, viewsLeft, visibilityLayer, rarity, capsuleType }) => {
     if (savingLockRef.current || geo.lat === null || !session?.user?.id) {
       if (geo.lat === null) alert('Aguardando sinal GPS... Tente novamente em instantes.');
       return;
@@ -450,6 +450,8 @@ export default function App() {
         media_type: mediaTypeField,
         views_left: viewsLeft,
         created_by: session.user.id,
+        rarity: rarity || 'common',
+        capsule_type: capsuleType || 'standard',
       });
 
       // Log access (Marco Civil Art. 15) — fire-and-forget

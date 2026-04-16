@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { registerXPortlComponents } from '../aframe/registerComponents';
-import { isCapsuleLocked } from '../services/capsules';
+import { isCapsuleLocked, getRarity } from '../services/capsules';
 import { isPing, PING_LIFETIME } from '../services/pings';
 import { clusterCapsules } from '../services/clustering';
 
@@ -11,6 +11,14 @@ const COLORS = {
   unlocked: { main: '#00ff88', core: '#ffffff', ring: '#00ff88', emissive: '#00ff88' },
   locked:   { main: '#b44aff', core: '#ff44aa', ring: '#8833cc', emissive: '#b44aff' },
   vortex:   { main: '#00e5ff', core: '#ffffff', ring: '#00e5ff', emissive: '#00e5ff' },
+};
+
+// Rarity visual overrides — scale, ring count, emissive intensity
+const RARITY_VFX = {
+  common:    { rings: 2, emMult: 1.0, haloMult: 1.0, spinSpeed: 1.0 },
+  rare:      { rings: 3, emMult: 1.4, haloMult: 1.3, spinSpeed: 1.3 },
+  legendary: { rings: 4, emMult: 2.0, haloMult: 1.8, spinSpeed: 1.6 },
+  mythic:    { rings: 5, emMult: 3.0, haloMult: 2.5, spinSpeed: 2.0 },
 };
 
 export default function ARScene({ capsules, pings, onCapsuleClick, onVortexClick }) {
@@ -250,67 +258,85 @@ export default function ARScene({ capsules, pings, onCapsuleClick, onVortexClick
 // bumped up so the portal reads as a light source even in daylight.
 function buildCapsuleEntity(cap, altitudeY = 0) {
   const locked = isCapsuleLocked(cap);
-  const pal = locked ? COLORS.locked : COLORS.unlocked;
+  const rarityInfo = getRarity(cap);
+  const vfx = RARITY_VFX[rarityInfo.key] || RARITY_VFX.common;
+  const scale = rarityInfo.scale;
+
+  // Use rarity color for rare+ capsules, otherwise locked/unlocked palette
+  const useRarityColor = rarityInfo.key !== 'common';
+  const pal = locked
+    ? COLORS.locked
+    : useRarityColor
+      ? { main: rarityInfo.color, core: '#ffffff', ring: rarityInfo.color, emissive: rarityInfo.color }
+      : COLORS.unlocked;
 
   const wrapper = document.createElement('a-entity');
   wrapper.setAttribute('gps-entity-place', `latitude: ${cap.lat}; longitude: ${cap.lng};`);
   wrapper.setAttribute('look-at', '[gps-camera]');
-  // Lock to a fixed altitude so capsules appear at eye level, not in the sky
   wrapper.setAttribute('fixed-altitude', `y: ${altitudeY}`);
 
-  // Outer halo: low-opacity large sphere that sells the "glow" in daylight
+  // Outer halo — bigger and brighter for higher rarities
+  const haloR = (3.6 * scale * vfx.haloMult).toFixed(1);
   const halo = document.createElement('a-sphere');
-  halo.setAttribute('radius', '3.6');
+  halo.setAttribute('radius', haloR);
   halo.setAttribute('color', pal.emissive);
-  halo.setAttribute('material', `opacity: 0.07; emissive: ${pal.emissive}; emissiveIntensity: 1.4; transparent: true; depthWrite: false; shader: flat`);
+  halo.setAttribute('material', `opacity: ${(0.07 * vfx.emMult).toFixed(2)}; emissive: ${pal.emissive}; emissiveIntensity: ${(1.4 * vfx.emMult).toFixed(1)}; transparent: true; depthWrite: false; shader: flat`);
   halo.setAttribute('animation__halo', 'property: scale; from: 0.92 0.92 0.92; to: 1.08 1.08 1.08; dur: 2800; easing: easeInOutSine; loop: true; dir: alternate');
 
+  // Main sphere
+  const sphereR = (1.5 * scale).toFixed(2);
   const sphere = document.createElement('a-sphere');
-  sphere.setAttribute('radius', '1.5');
+  sphere.setAttribute('radius', sphereR);
   sphere.setAttribute('color', pal.main);
-  sphere.setAttribute('material', `opacity: 0.9; emissive: ${pal.emissive}; emissiveIntensity: 1.3; transparent: true; metalness: 0.3; roughness: 0.25`);
+  sphere.setAttribute('material', `opacity: 0.9; emissive: ${pal.emissive}; emissiveIntensity: ${(1.3 * vfx.emMult).toFixed(1)}; transparent: true; metalness: 0.3; roughness: 0.25`);
   sphere.setAttribute('class', 'clickable');
   sphere.setAttribute('capsule-data', `capsuleId: ${cap.id}; locked: ${locked}`);
-  sphere.setAttribute('glitch-glow', `color: ${pal.emissive}; speed: ${locked ? 3500 : 2000}; locked: ${locked}`);
-  sphere.setAttribute('animation__spin', `property: rotation; from: 0 0 0; to: 0 360 0; dur: ${locked ? 12000 : 8000}; easing: linear; loop: true`);
+  sphere.setAttribute('glitch-glow', `color: ${pal.emissive}; speed: ${Math.round((locked ? 3500 : 2000) / vfx.spinSpeed)}; locked: ${locked}`);
+  const spinDur = Math.round((locked ? 12000 : 8000) / vfx.spinSpeed);
+  sphere.setAttribute('animation__spin', `property: rotation; from: 0 0 0; to: 0 360 0; dur: ${spinDur}; easing: linear; loop: true`);
   sphere.setAttribute('animation__float', 'property: position; from: 0 0 0; to: 0 1.2 0; dur: 3000; easing: easeInOutSine; loop: true; dir: alternate');
 
+  // Core
   const core = document.createElement('a-sphere');
-  core.setAttribute('radius', '0.55');
+  core.setAttribute('radius', (0.55 * scale).toFixed(2));
   core.setAttribute('color', pal.core);
-  core.setAttribute('material', `opacity: ${locked ? '0.3' : '0.65'}; emissive: ${pal.emissive}; emissiveIntensity: ${locked ? '1.4' : '3.0'}; transparent: true; shader: flat`);
+  core.setAttribute('material', `opacity: ${locked ? '0.3' : '0.65'}; emissive: ${pal.emissive}; emissiveIntensity: ${(locked ? 1.4 : 3.0 * vfx.emMult).toFixed(1)}; transparent: true; shader: flat`);
   core.setAttribute('animation', 'property: scale; from: 0.7 0.7 0.7; to: 1.35 1.35 1.35; dur: 1500; easing: easeInOutSine; loop: true; dir: alternate');
   sphere.appendChild(core);
 
-  // Primary equatorial ring (thicker, brighter)
-  const ring = document.createElement('a-torus');
-  ring.setAttribute('radius', '2.4');
-  ring.setAttribute('radius-tubular', '0.05');
-  ring.setAttribute('color', pal.ring);
-  ring.setAttribute('material', `opacity: ${locked ? '0.25' : '0.55'}; emissive: ${pal.emissive}; emissiveIntensity: 1.1; transparent: true; shader: flat`);
-  ring.setAttribute('rotation', '70 0 0');
-  ring.setAttribute('animation', `property: rotation; from: 70 0 0; to: 70 360 0; dur: ${locked ? 15000 : 6000}; easing: linear; loop: true`);
+  // Dynamic ring count based on rarity
+  const ringAngles = [
+    { rx: 70, ry: 0, r: 2.4, tube: 0.05, op: locked ? 0.25 : 0.55 },
+    { rx: 20, ry: 45, r: 2.8, tube: 0.03, op: locked ? 0.15 : 0.35 },
+    { rx: 50, ry: 120, r: 3.2, tube: 0.025, op: 0.25 },
+    { rx: 10, ry: 200, r: 3.6, tube: 0.02, op: 0.2 },
+    { rx: 80, ry: 60, r: 4.0, tube: 0.015, op: 0.15 },
+  ];
 
-  // Secondary orbital ring crossing on a different axis
-  const ring2 = document.createElement('a-torus');
-  ring2.setAttribute('radius', '2.8');
-  ring2.setAttribute('radius-tubular', '0.03');
-  ring2.setAttribute('color', pal.ring);
-  ring2.setAttribute('material', `opacity: ${locked ? '0.15' : '0.35'}; emissive: ${pal.emissive}; emissiveIntensity: 0.8; transparent: true; shader: flat`);
-  ring2.setAttribute('rotation', '20 45 0');
-  ring2.setAttribute('animation', `property: rotation; from: 20 45 0; to: 20 405 0; dur: ${locked ? 18000 : 9000}; easing: linear; loop: true`);
-  wrapper.appendChild(ring2);
+  for (let i = 0; i < vfx.rings; i++) {
+    const cfg = ringAngles[i];
+    const ring = document.createElement('a-torus');
+    ring.setAttribute('radius', (cfg.r * scale).toFixed(1));
+    ring.setAttribute('radius-tubular', String(cfg.tube));
+    ring.setAttribute('color', pal.ring);
+    ring.setAttribute('material', `opacity: ${cfg.op}; emissive: ${pal.emissive}; emissiveIntensity: ${(1.1 * vfx.emMult * (1 - i * 0.15)).toFixed(1)}; transparent: true; shader: flat`);
+    ring.setAttribute('rotation', `${cfg.rx} ${cfg.ry} 0`);
+    const dur = Math.round((6000 + i * 2000) / vfx.spinSpeed);
+    ring.setAttribute('animation', `property: rotation; from: ${cfg.rx} ${cfg.ry} 0; to: ${cfg.rx} ${cfg.ry + 360} 0; dur: ${dur}; easing: linear; loop: true`);
+    wrapper.appendChild(ring);
+  }
+
   wrapper.appendChild(halo);
 
   if (locked) {
-    const ring2 = document.createElement('a-torus');
-    ring2.setAttribute('radius', '2.0');
-    ring2.setAttribute('radius-tubular', '0.025');
-    ring2.setAttribute('color', '#ff3366');
-    ring2.setAttribute('material', 'opacity: 0.1; emissive: #ff3366; emissiveIntensity: 0.5; transparent: true');
-    ring2.setAttribute('rotation', '20 90 0');
-    ring2.setAttribute('animation', 'property: rotation; from: 20 90 0; to: 20 450 0; dur: 10000; easing: linear; loop: true');
-    wrapper.appendChild(ring2);
+    const lockRing = document.createElement('a-torus');
+    lockRing.setAttribute('radius', (2.0 * scale).toFixed(1));
+    lockRing.setAttribute('radius-tubular', '0.025');
+    lockRing.setAttribute('color', '#ff3366');
+    lockRing.setAttribute('material', 'opacity: 0.1; emissive: #ff3366; emissiveIntensity: 0.5; transparent: true');
+    lockRing.setAttribute('rotation', '20 90 0');
+    lockRing.setAttribute('animation', 'property: rotation; from: 20 90 0; to: 20 450 0; dur: 10000; easing: linear; loop: true');
+    wrapper.appendChild(lockRing);
   }
 
   if (cap.media_type === 'audio' && cap.media_url) {
@@ -320,7 +346,6 @@ function buildCapsuleEntity(cap, altitudeY = 0) {
   }
 
   wrapper.appendChild(sphere);
-  wrapper.appendChild(ring);
   return wrapper;
 }
 

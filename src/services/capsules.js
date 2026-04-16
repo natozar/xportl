@@ -30,6 +30,32 @@ function isSupabaseConfigured() {
   return !!(import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY);
 }
 
+// ── Rarity & type config ──
+
+export const RARITIES = {
+  common:    { key: 'common',    label: 'Comum',     color: '#a0a0b0', icon: '○', scale: 1.0 },
+  rare:      { key: 'rare',      label: 'Rara',      color: '#3b82f6', icon: '◆', scale: 1.15 },
+  legendary: { key: 'legendary', label: 'Lendaria',  color: '#f59e0b', icon: '★', scale: 1.35 },
+  mythic:    { key: 'mythic',    label: 'Mitica',     color: '#ec4899', icon: '✦', scale: 1.5 },
+};
+
+export const CAPSULE_TYPES = {
+  standard:  { key: 'standard',  label: 'Padrao',    icon: '🌀', desc: 'Capsula classica' },
+  echo:      { key: 'echo',      label: 'Eco',       icon: '📡', desc: 'Pode ser re-plantada por quem abre' },
+  chain:     { key: 'chain',     label: 'Corrente',   icon: '🔗', desc: 'So abre se voce deixar uma aqui' },
+  challenge: { key: 'challenge', label: 'Desafio',    icon: '🎯', desc: 'Contem uma missao para completar' },
+  collab:    { key: 'collab',    label: 'Collab',     icon: '🎨', desc: 'Mural coletivo — todos adicionam' },
+  auction:   { key: 'auction',   label: 'Leilao',     icon: '💎', desc: 'Custa XP para abrir' },
+};
+
+export function getRarity(capsule) {
+  return RARITIES[capsule?.rarity] || RARITIES.common;
+}
+
+export function getCapsuleType(capsule) {
+  return CAPSULE_TYPES[capsule?.capsule_type] || CAPSULE_TYPES.standard;
+}
+
 // ── Capsule state helpers ──
 
 export function isCapsuleLocked(capsule) {
@@ -58,7 +84,7 @@ export function haptic(pattern = [100, 50, 100]) {
 
 // ── CRUD ──
 
-export async function createCapsule({ lat, lng, altitude, content, visibility_layer, unlock_date, media_url, media_type, views_left, created_by }) {
+export async function createCapsule({ lat, lng, altitude, content, visibility_layer, unlock_date, media_url, media_type, views_left, created_by, rarity, capsule_type }) {
   const capsule = {
     lat,
     lng,
@@ -70,6 +96,8 @@ export async function createCapsule({ lat, lng, altitude, content, visibility_la
     media_type: media_type || null,
     views_left: views_left ?? null,
     created_by: created_by || null,
+    rarity: rarity || 'common',
+    capsule_type: capsule_type || 'standard',
   };
 
   if (!isSupabaseConfigured()) {
@@ -80,7 +108,7 @@ export async function createCapsule({ lat, lng, altitude, content, visibility_la
   const { data, error } = await supabase
     .from('capsules')
     .insert(capsule)
-    .select('id, lat, lng, content, visibility_layer, created_at')
+    .select('id, lat, lng, content, visibility_layer, rarity, capsule_type, created_at')
     .single();
 
   if (error) {
@@ -196,7 +224,7 @@ export async function getNearbyCapsules(lat, lng, radiusMeters = 50) {
   const degreeRadius = radiusMeters / 111000;
   const { data: rawData, error: selectError } = await supabase
     .from('capsules')
-    .select('id, lat, lng, altitude, content, visibility_layer, unlock_date, views_count, views_left, media_url, media_type, created_at, created_by, moderation_status')
+    .select('id, lat, lng, altitude, content, visibility_layer, unlock_date, views_count, views_left, media_url, media_type, created_at, created_by, moderation_status, rarity, capsule_type')
     .gte('lat', lat - degreeRadius)
     .lte('lat', lat + degreeRadius)
     .gte('lng', lng - degreeRadius)

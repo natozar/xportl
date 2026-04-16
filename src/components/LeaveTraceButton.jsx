@@ -1,21 +1,27 @@
 import { useState, useEffect, useRef } from 'react';
 import { useMediaCapture } from '../hooks/useMediaCapture';
 import { preloadNsfwModel } from '../services/nsfwFilter';
+import { RARITIES, CAPSULE_TYPES } from '../services/capsules';
 import CameraModal from './CameraModal';
 
 const GHOST_VIEW_OPTIONS = [5, 10, 50];
 const MAX_MESSAGE = 280;
 
-const TYPES = [
-  { key: 'perpetual', label: 'Publica',  icon: '🌍', color: '#00ff88', rgb: '0,255,136', layer: 'public',  viewsLeft: null, desc: 'Fica para sempre' },
-  { key: 'ghost',     label: 'Ghost',    icon: '👻', color: '#b44aff', rgb: '180,74,255', layer: 'ghost',   viewsLeft: 10,   desc: 'Autodestroe' },
-  { key: 'private',   label: 'Privada',  icon: '🔒', color: '#00e5ff', rgb: '0,229,255', layer: 'private', viewsLeft: null, desc: 'So por link' },
+const VISIBILITY = [
+  { key: 'public',  label: 'Publica',  icon: '🌍', color: '#00ff88', rgb: '0,255,136' },
+  { key: 'ghost',   label: 'Ghost',    icon: '👻', color: '#b44aff', rgb: '180,74,255' },
+  { key: 'private', label: 'Privada',  icon: '🔒', color: '#00e5ff', rgb: '0,229,255' },
 ];
+
+const RARITY_LIST = Object.values(RARITIES);
+const TYPE_LIST = Object.values(CAPSULE_TYPES);
 
 export default function LeaveTraceButton({ onPress, saving }) {
   const [open, setOpen] = useState(false);
   const [feedback, setFeedback] = useState(null);
-  const [step, setStep] = useState('compose'); // 'compose' | 'options'
+  const [step, setStep] = useState('compose'); // 'compose' | 'type'
+  const [visIdx, setVisIdx] = useState(0);
+  const [rarityIdx, setRarityIdx] = useState(0);
   const [typeIdx, setTypeIdx] = useState(0);
   const [ghostViews, setGhostViews] = useState(10);
   const [message, setMessage] = useState('');
@@ -37,7 +43,9 @@ export default function LeaveTraceButton({ onPress, saving }) {
     }
   }, [open, step]);
 
-  const currentType = TYPES[typeIdx];
+  const currentVis = VISIBILITY[visIdx];
+  const currentRarity = RARITY_LIST[rarityIdx];
+  const currentCType = TYPE_LIST[typeIdx];
 
   const handleCreate = async () => {
     if (saving) return;
@@ -57,11 +65,15 @@ export default function LeaveTraceButton({ onPress, saving }) {
       message: (message || '').trim() || 'Estive aqui!',
       mediaBlob: media?.blob || null,
       mediaType: media?.type || null,
-      viewsLeft: currentType.key === 'ghost' ? ghostViews : null,
-      visibilityLayer: currentType.layer,
+      viewsLeft: currentVis.key === 'ghost' ? ghostViews : null,
+      visibilityLayer: currentVis.key,
+      rarity: currentRarity.key,
+      capsuleType: currentCType.key,
     });
 
     clearMedia();
+    setVisIdx(0);
+    setRarityIdx(0);
     setTypeIdx(0);
     setGhostViews(10);
     setMessage('');
@@ -75,6 +87,8 @@ export default function LeaveTraceButton({ onPress, saving }) {
   const handleClose = () => {
     setOpen(false);
     clearMedia();
+    setVisIdx(0);
+    setRarityIdx(0);
     setTypeIdx(0);
     setMessage('');
     setLockUntilTomorrow(false);
@@ -112,44 +126,109 @@ export default function LeaveTraceButton({ onPress, saving }) {
               </button>
             </div>
 
-            {/* Type pills */}
-            <div style={st.typePills}>
-              {TYPES.map((t, i) => {
-                const active = typeIdx === i;
-                return (
-                  <button
-                    key={t.key}
-                    style={{
-                      ...st.pill,
-                      ...(active ? { background: `rgba(${t.rgb}, 0.12)`, borderColor: `rgba(${t.rgb}, 0.3)`, color: t.color } : {}),
-                    }}
-                    onClick={() => setTypeIdx(i)}
-                  >
-                    <span style={{ fontSize: '0.85rem' }}>{t.icon}</span>
-                    <span style={st.pillLabel}>{t.label}</span>
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Ghost views */}
-            {currentType.key === 'ghost' && (
-              <div style={st.ghostRow}>
-                <span style={st.ghostLabel}>Autodestroe apos</span>
-                <div style={st.ghostBtns}>
-                  {GHOST_VIEW_OPTIONS.map((v) => (
-                    <button
-                      key={v}
-                      style={{
-                        ...st.ghostBtn,
-                        ...(ghostViews === v ? { background: 'rgba(180,74,255,0.15)', borderColor: 'rgba(180,74,255,0.35)', color: '#b44aff' } : {}),
-                      }}
-                      onClick={() => setGhostViews(v)}
-                    >{v}</button>
-                  ))}
-                  <span style={st.ghostUnit}>views</span>
+            {step === 'compose' ? (
+              <>
+                {/* Visibility pills */}
+                <div style={st.typePills}>
+                  {VISIBILITY.map((t, i) => {
+                    const active = visIdx === i;
+                    return (
+                      <button
+                        key={t.key}
+                        style={{
+                          ...st.pill,
+                          ...(active ? { background: `rgba(${t.rgb}, 0.12)`, borderColor: `rgba(${t.rgb}, 0.3)`, color: t.color } : {}),
+                        }}
+                        onClick={() => setVisIdx(i)}
+                      >
+                        <span style={{ fontSize: '0.85rem' }}>{t.icon}</span>
+                        <span style={st.pillLabel}>{t.label}</span>
+                      </button>
+                    );
+                  })}
                 </div>
-              </div>
+
+                {/* Ghost views */}
+                {currentVis.key === 'ghost' && (
+                  <div style={st.ghostRow}>
+                    <span style={st.ghostLabel}>Autodestroe apos</span>
+                    <div style={st.ghostBtns}>
+                      {GHOST_VIEW_OPTIONS.map((v) => (
+                        <button
+                          key={v}
+                          style={{
+                            ...st.ghostBtn,
+                            ...(ghostViews === v ? { background: 'rgba(180,74,255,0.15)', borderColor: 'rgba(180,74,255,0.35)', color: '#b44aff' } : {}),
+                          }}
+                          onClick={() => setGhostViews(v)}
+                        >{v}</button>
+                      ))}
+                      <span style={st.ghostUnit}>views</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Rarity + Type toggle button */}
+                <button style={st.advancedToggle} onClick={() => setStep('type')}>
+                  <span style={{ color: currentRarity.color }}>{currentRarity.icon} {currentRarity.label}</span>
+                  <span style={st.advSep}>·</span>
+                  <span>{currentCType.icon} {currentCType.label}</span>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" style={{ marginLeft: 'auto', opacity: 0.4 }}>
+                    <polyline points="9 18 15 12 9 6" />
+                  </svg>
+                </button>
+              </>
+            ) : (
+              <>
+                {/* ── Type selection step ── */}
+                <button style={st.backToCompose} onClick={() => setStep('compose')}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><polyline points="15 18 9 12 15 6" /></svg>
+                  <span>Voltar</span>
+                </button>
+
+                {/* Rarity */}
+                <div style={st.sectionLabel}>RARIDADE</div>
+                <div style={st.rarityRow}>
+                  {RARITY_LIST.map((r, i) => {
+                    const active = rarityIdx === i;
+                    return (
+                      <button
+                        key={r.key}
+                        style={{
+                          ...st.rarityBtn,
+                          ...(active ? { background: `${r.color}18`, borderColor: `${r.color}55`, color: r.color } : {}),
+                        }}
+                        onClick={() => setRarityIdx(i)}
+                      >
+                        <span style={{ fontSize: '1rem' }}>{r.icon}</span>
+                        <span style={st.rarityName}>{r.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Capsule type */}
+                <div style={st.sectionLabel}>TIPO DE CAPSULA</div>
+                <div style={st.typeGrid}>
+                  {TYPE_LIST.map((t, i) => {
+                    const active = typeIdx === i;
+                    return (
+                      <button
+                        key={t.key}
+                        style={{
+                          ...st.typeCard,
+                          ...(active ? { borderColor: 'rgba(0,240,255,0.3)', background: 'rgba(0,240,255,0.06)' } : {}),
+                        }}
+                        onClick={() => setTypeIdx(i)}
+                      >
+                        <span style={{ fontSize: '1.2rem' }}>{t.icon}</span>
+                        <span style={{ ...st.typeCardName, ...(active ? { color: '#00f0ff' } : {}) }}>{t.label}</span>
+                        <span style={st.typeCardDesc}>{t.desc}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </>
             )}
 
             {/* ── NSFW alert ── */}
@@ -245,7 +324,7 @@ export default function LeaveTraceButton({ onPress, saving }) {
               <button
                 style={{
                   ...st.sendBtn,
-                  background: hasContent ? `linear-gradient(135deg, ${currentType.color}, ${currentType.color}cc)` : 'rgba(255,255,255,0.06)',
+                  background: hasContent ? `linear-gradient(135deg, ${currentVis.color}, ${currentVis.color}cc)` : 'rgba(255,255,255,0.06)',
                   color: hasContent ? '#0a0814' : 'rgba(255,255,255,0.2)',
                 }}
                 onClick={handleCreate}
@@ -389,6 +468,61 @@ const st = {
   ghostUnit: {
     fontSize: '0.5rem', color: 'rgba(180,74,255,0.35)', fontWeight: 600,
     letterSpacing: '0.08em', marginLeft: 2,
+  },
+
+  // ── Advanced toggle ──
+  advancedToggle: {
+    width: '100%', display: 'flex', alignItems: 'center', gap: 8,
+    padding: '10px 14px', marginBottom: 12, borderRadius: 12,
+    background: 'rgba(255,255,255,0.03)',
+    border: '1px solid rgba(255,255,255,0.06)',
+    color: 'rgba(255,255,255,0.5)', fontSize: '0.7rem', fontWeight: 600,
+    fontFamily: 'inherit',
+    touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+  },
+  advSep: { color: 'rgba(255,255,255,0.15)' },
+  backToCompose: {
+    display: 'flex', alignItems: 'center', gap: 6, marginBottom: 14,
+    background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)',
+    fontSize: '0.7rem', fontWeight: 600, fontFamily: 'inherit', padding: 0,
+    touchAction: 'manipulation',
+  },
+  sectionLabel: {
+    fontSize: '0.55rem', fontWeight: 700, letterSpacing: '0.12em',
+    color: 'rgba(255,255,255,0.2)', marginBottom: 8, textTransform: 'uppercase',
+  },
+  rarityRow: {
+    display: 'flex', gap: 6, marginBottom: 16,
+  },
+  rarityBtn: {
+    flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
+    padding: '10px 4px', borderRadius: 12,
+    background: 'rgba(255,255,255,0.03)',
+    border: '1px solid rgba(255,255,255,0.06)',
+    color: 'rgba(255,255,255,0.35)', fontFamily: 'inherit',
+    touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+    transition: 'all 0.2s',
+  },
+  rarityName: { fontSize: '0.55rem', fontWeight: 700, letterSpacing: '0.04em' },
+  typeGrid: {
+    display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 16,
+  },
+  typeCard: {
+    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
+    padding: '14px 8px', borderRadius: 14,
+    background: 'rgba(255,255,255,0.02)',
+    border: '1px solid rgba(255,255,255,0.05)',
+    fontFamily: 'inherit',
+    touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+    transition: 'all 0.2s',
+  },
+  typeCardName: {
+    fontSize: '0.65rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)',
+    letterSpacing: '0.03em',
+  },
+  typeCardDesc: {
+    fontSize: '0.5rem', color: 'rgba(255,255,255,0.2)', textAlign: 'center',
+    lineHeight: 1.3,
   },
 
   // ── NSFW / scanning ──

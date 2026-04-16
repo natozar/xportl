@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
-import { isCapsuleLocked, isGhostCapsule, getTimeRemaining, haptic, consumeView, selfDestruct } from '../services/capsules';
+import { isCapsuleLocked, isGhostCapsule, getTimeRemaining, haptic, consumeView, selfDestruct, getRarity, getCapsuleType } from '../services/capsules';
 import { getComments, addComment } from '../services/comments';
 import { supabase } from '../services/supabase';
 
@@ -20,7 +20,10 @@ export default function CapsuleModal({ capsule, onClose, onSelfDestruct, onRepor
   const timeLeft = capsule ? getTimeRemaining(capsule) : null;
   const content = capsule?.content || {};
   const body = content.body || content.emoji || '';
-  const accent = locked ? '#b44aff' : '#00f0ff';
+  const rarity = capsule ? getRarity(capsule) : null;
+  const cType = capsule ? getCapsuleType(capsule) : null;
+  const useRarityColor = rarity && rarity.key !== 'common';
+  const accent = locked ? '#b44aff' : useRarityColor ? rarity.color : '#00f0ff';
 
   // Get current user
   useEffect(() => {
@@ -109,6 +112,16 @@ export default function CapsuleModal({ capsule, onClose, onSelfDestruct, onRepor
           <span style={{ ...st.topChip, borderColor: `${accent}33`, color: accent }}>
             {capsule.visibility_layer || 'public'}
           </span>
+          {rarity && rarity.key !== 'common' && (
+            <span style={{ ...st.topChip, borderColor: `${rarity.color}33`, color: rarity.color, fontWeight: 700 }}>
+              {rarity.icon} {rarity.label}
+            </span>
+          )}
+          {cType && cType.key !== 'standard' && (
+            <span style={st.topChip}>
+              {cType.icon} {cType.label}
+            </span>
+          )}
           {capsule.distance_meters !== undefined && (
             <span style={st.topChip}>
               {capsule.distance_meters < 1 ? '<1m' : `${capsule.distance_meters.toFixed(0)}m`}
