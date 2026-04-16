@@ -18,10 +18,13 @@ export function useCamera() {
 
     try {
       // Request camera just to check permission — then immediately release
+      // Request the highest resolution the device supports.
+      // This also "warms up" the sensor so the first real stream
+      // (AR or CameraModal) opens faster.
       let stream;
       try {
         stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } },
+          video: { facingMode: { ideal: 'environment' }, width: { ideal: 3840 }, height: { ideal: 2160 } },
           audio: false,
         });
       } catch (_) {

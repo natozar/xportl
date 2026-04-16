@@ -2,11 +2,11 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { preloadNsfwModel } from '../services/nsfwFilter';
 
 const MAX_VIDEO_SECONDS = 15;
-const MAX_IMAGE_DIMENSION = 1600;      // px on the longer side
-const IMAGE_QUALITY = 0.82;            // webp quality after resize
-const VIDEO_BITRATE = 1_500_000;       // 1.5 Mbps ≈ 2.8 MB for 15s
-const AUDIO_BITRATE = 64_000;          // 64 kbps
-const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;  // 5 MB hard cap
+const MAX_IMAGE_DIMENSION = 2560;      // 2K — sharp even on retina displays
+const IMAGE_QUALITY = 0.88;            // webp quality — higher fidelity
+const VIDEO_BITRATE = 2_500_000;       // 2.5 Mbps — crisp 1080p for 15s ≈ 4.7 MB
+const AUDIO_BITRATE = 96_000;          // 96 kbps — clearer audio
+const MAX_UPLOAD_BYTES = 8 * 1024 * 1024;  // 8 MB — room for quality
 
 // Resize + re-encode a source canvas so large phone captures don't bloat
 // Storage. Returns { previewUrl, blob } or rejects if blob > MAX_UPLOAD_BYTES.
@@ -108,7 +108,7 @@ function releaseArCamera() {
 function restoreArCamera(arVideo) {
   if (!arVideo) return;
   navigator.mediaDevices
-    .getUserMedia({ video: { facingMode: 'environment' }, audio: false })
+    .getUserMedia({ video: { facingMode: 'environment', width: { ideal: 2560 }, height: { ideal: 1440 } }, audio: false })
     .then((stream) => {
       arVideo.srcObject = stream;
       return arVideo.play().catch(() => {});
@@ -195,9 +195,23 @@ export default function CameraModal({ onClose, onCapture, initialMode = 'photo' 
         // whatever was holding it (AR.js or our own previous stream).
         await new Promise((r) => setTimeout(r, 300));
 
+        // Request the best the hardware can deliver.
+        // 'ideal' lets the browser pick the closest supported resolution
+        // without failing. Environment camera gets 4K request (phones
+        // typically cap at their native sensor); front camera gets 1080p.
+        const isBack = facing === 'environment';
         const videoConstraints = mode === 'video'
-          ? { facingMode: facing, width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 24, max: 30 } }
-          : { facingMode: facing, width: { ideal: 1920 }, height: { ideal: 1440 } };
+          ? {
+              facingMode: facing,
+              width:     { ideal: isBack ? 1920 : 1280 },
+              height:    { ideal: isBack ? 1080 : 720 },
+              frameRate: { ideal: 30, max: 60 },
+            }
+          : {
+              facingMode: facing,
+              width:  { ideal: isBack ? 3840 : 1920 },
+              height: { ideal: isBack ? 2160 : 1080 },
+            };
 
         const stream = await requestStreamWithRetry({ video: videoConstraints, audio: false });
         if (cancelled) {

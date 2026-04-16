@@ -63,14 +63,17 @@ export default function ARScene({ capsules, pings, onCapsuleClick, onVortexClick
 
     const scene = document.createElement('a-scene');
     scene.setAttribute('vr-mode-ui', 'enabled: false');
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    scene.setAttribute('renderer', `antialias: true; alpha: true; logarithmicDepthBuffer: true; pixelRatio: ${dpr}`);
-    // Request HD camera. AR.js will use getUserMedia with these constraints.
-    // On portrait phones, swap width/height so the camera matches orientation.
+    // Use native pixel ratio (capped at 3 for perf) so the 3D overlay
+    // renders at the same sharpness as the camera feed beneath it.
+    const dpr = Math.min(window.devicePixelRatio || 1, 3);
+    scene.setAttribute('renderer', `antialias: true; alpha: true; logarithmicDepthBuffer: true; pixelRatio: ${dpr}; precision: highp`);
+    // Request the max resolution the device sensor supports.
+    // AR.js will pass sourceWidth/Height to getUserMedia as {ideal}.
+    // Portrait phones: swap so the long axis matches the screen.
     const portrait = window.innerHeight > window.innerWidth;
-    const sw = portrait ? 1080 : 1920;
-    const sh = portrait ? 1920 : 1080;
-    scene.setAttribute('arjs', `sourceType: webcam; debugUIEnabled: false; videoTexture: true; sourceWidth: ${sw}; sourceHeight: ${sh}; displayWidth: ${window.innerWidth}; displayHeight: ${window.innerHeight}`);
+    const sw = portrait ? 1440 : 2560;
+    const sh = portrait ? 2560 : 1440;
+    scene.setAttribute('arjs', `sourceType: webcam; debugUIEnabled: false; videoTexture: true; sourceWidth: ${sw}; sourceHeight: ${sh}; displayWidth: ${window.innerWidth * dpr}; displayHeight: ${window.innerHeight * dpr}`);
 
     const camera = document.createElement('a-camera');
     camera.setAttribute('gps-camera', buildGpsCameraAttr());
