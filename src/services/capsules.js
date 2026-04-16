@@ -33,10 +33,10 @@ function isSupabaseConfigured() {
 // ── Rarity & type config ──
 
 export const RARITIES = {
-  common:    { key: 'common',    label: 'Comum',     color: '#a0a0b0', icon: '○', scale: 1.0 },
-  rare:      { key: 'rare',      label: 'Rara',      color: '#3b82f6', icon: '◆', scale: 1.15 },
-  legendary: { key: 'legendary', label: 'Lendaria',  color: '#f59e0b', icon: '★', scale: 1.35 },
-  mythic:    { key: 'mythic',    label: 'Mitica',     color: '#ec4899', icon: '✦', scale: 1.5 },
+  common:    { key: 'common',    label: 'Comum',     color: '#a0a0b0', icon: '○', scale: 1.0, minLevel: 1 },
+  rare:      { key: 'rare',      label: 'Rara',      color: '#3b82f6', icon: '◆', scale: 1.15, minLevel: 5 },
+  legendary: { key: 'legendary', label: 'Lendaria',  color: '#f59e0b', icon: '★', scale: 1.35, minLevel: 15 },
+  mythic:    { key: 'mythic',    label: 'Mitica',     color: '#ec4899', icon: '✦', scale: 1.5, minLevel: 30 },
 };
 
 export const CAPSULE_TYPES = {
