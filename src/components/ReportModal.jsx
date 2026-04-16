@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { submitReport } from '../services/moderation';
 import { haptic } from '../services/capsules';
 

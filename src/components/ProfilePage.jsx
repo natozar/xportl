@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import { useState, useRef } from 'react';
 import { updateDisplayName } from '../services/auth';
 import { supabase } from '../services/supabase';
 import { xpProgress, getLevelTitle, BADGES } from '../services/gamification';
@@ -216,7 +216,7 @@ const s = {
   avatarInitial: { fontSize: '2rem', fontWeight: 700, color: '#00f0ff' },
   avatarOverlay: {
     position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-    background: 'rgba(0,0,0,0.5)', color: '#fff', opacity: 0, transition: 'opacity 0.2s',
+    background: 'rgba(0,0,0,0.4)', color: '#fff', opacity: 0.5, transition: 'opacity 0.2s',
   },
   miniSpinner: {
     width: 16, height: 16, border: '2px solid rgba(255,255,255,0.2)',

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { isCapsuleLocked, isGhostCapsule } from '../services/capsules';
 
 export default function DebugPanel({ geo, nearbyCapsules, lastScan, supabaseOk }) {

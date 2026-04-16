@@ -1,4 +1,3 @@
-import React from 'react';
 
 export default function Radar({ lat, lng, accuracy, nearbyCount = 0, scanRadius = 50 }) {
   return (

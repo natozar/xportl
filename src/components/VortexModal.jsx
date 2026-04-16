@@ -1,4 +1,3 @@
-import React from 'react';
 import { isCapsuleLocked, isGhostCapsule, getTimeRemaining } from '../services/capsules';
 
 export default function VortexModal({ vortex, onClose, onSelectCapsule }) {

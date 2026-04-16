@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { isCapsuleLocked, isGhostCapsule } from '../services/capsules';
 
 // Leaflet is loaded dynamically to avoid blocking initial bundle

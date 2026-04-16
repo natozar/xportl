@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { getLeaderboard, BADGES, getLevelTitle } from '../services/gamification';
 
 export default function Leaderboard({ currentUserId, onClose }) {

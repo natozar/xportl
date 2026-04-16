@@ -1,4 +1,3 @@
-import React from 'react';
 
 /**
  * PWA Install Prompt — dual-mode (Android native / iOS instructional)

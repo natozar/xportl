@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { preloadNsfwModel } from '../services/nsfwFilter';
 
 const MAX_VIDEO_SECONDS = 15;

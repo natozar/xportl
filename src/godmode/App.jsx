@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '../services/supabase';
 import Overview from './pages/Overview';
 import CapsuleMap from './pages/CapsuleMap';

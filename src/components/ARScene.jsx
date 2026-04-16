@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { registerXPortlComponents } from '../aframe/registerComponents';
 import { isCapsuleLocked } from '../services/capsules';
 import { isPing, PING_LIFETIME } from '../services/pings';

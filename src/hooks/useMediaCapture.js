@@ -86,6 +86,13 @@ export function useMediaCapture() {
     }
   }, []);
 
+  const stopAudioRecording = useCallback(() => {
+    if (recorderRef.current?.state === 'recording') {
+      recorderRef.current.stop();
+      setRecording(false);
+    }
+  }, []);
+
   // ── Start audio recording ──
   const startAudioRecording = useCallback(async () => {
     setModerationError(null);
@@ -121,7 +128,7 @@ export function useMediaCapture() {
     } catch (err) {
       console.error('[XPortl] Audio recording failed:', err);
     }
-  }, []);
+  }, [stopAudioRecording]);
 
   // Ingest a capture coming from CameraModal: runs NSFW scan on images and
   // on the first frame of videos, sets `media` if allowed, otherwise
@@ -154,13 +161,6 @@ export function useMediaCapture() {
 
     setMedia({ blob, type, preview: previewUrl });
     return true;
-  }, []);
-
-  const stopAudioRecording = useCallback(() => {
-    if (recorderRef.current?.state === 'recording') {
-      recorderRef.current.stop();
-      setRecording(false);
-    }
   }, []);
 
   const clearMedia = useCallback(() => {

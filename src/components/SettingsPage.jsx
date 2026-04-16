@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { signOut } from '../services/auth';
 import { exportUserData, requestAccountDeletion } from '../services/lgpd';
 

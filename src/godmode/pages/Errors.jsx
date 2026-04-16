@@ -1,11 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '../../services/supabase';
 
 // ── AI Fix Suggestion Engine ──
 // Maps error patterns to actionable Claude Code prompts
 function generateFixSuggestion(error) {
   const msg = (error.error_message || '').toLowerCase();
-  const name = (error.error_name || '').toLowerCase();
+  const _name = (error.error_name || '').toLowerCase();
   const meta = error.metadata || {};
 
   // RLS / Permission errors
@@ -96,7 +96,7 @@ export default function Errors() {
   const [expandedId, setExpandedId] = useState(null);
   const [copiedId, setCopiedId] = useState(null);
 
-  const fetchErrors = async () => {
+  const fetchErrors = useCallback(async () => {
     setLoading(true);
 
     let query = supabase.from('error_events').select('*').order('captured_at', { ascending: false }).limit(200);
@@ -119,9 +119,9 @@ export default function Errors() {
       usersAffected: new Set((affectedRaw || []).map((e) => e.user_id)).size,
     });
     setLoading(false);
-  };
+  }, [filter]);
 
-  useEffect(() => { fetchErrors(); }, [filter]);
+  useEffect(() => { fetchErrors(); }, [fetchErrors]);
 
   const resolveError = async (id, type) => {
     await supabase.from('error_events').update({

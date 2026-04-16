@@ -171,7 +171,7 @@ let _hitTestSource = null;
  * Initialize hit-test source (call once after session starts).
  * Casts a ray from the center of the screen into the detected world.
  */
-export async function initHitTest(session, refSpace) {
+export async function initHitTest(session, _refSpace) {
   const viewerSpace = await session.requestReferenceSpace('viewer');
   _hitTestSource = await session.requestHitTestSource({ space: viewerSpace });
   return _hitTestSource;

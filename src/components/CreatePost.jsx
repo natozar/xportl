@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { preloadNsfwModel, classifyImage } from '../services/nsfwFilter';
 
 const MAX_CAPTION = 280;

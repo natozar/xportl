@@ -17,7 +17,7 @@ async function getModel() {
 
   loadingPromise = (async () => {
     // Dynamic import so TF.js doesn't bloat the initial bundle
-    const [tf, nsfwjs] = await Promise.all([
+    const [_tf, nsfwjs] = await Promise.all([
       import('@tensorflow/tfjs'),
       import('nsfwjs'),
     ]);

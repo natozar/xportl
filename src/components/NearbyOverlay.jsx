@@ -1,9 +1,11 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { isCapsuleLocked, isGhostCapsule } from '../services/capsules';
 
 export default function NearbyOverlay({ capsules, userLat, userLng, onSelect }) {
   const [heading, setHeading] = useState(0);
-  const [tick, setTick] = useState(0);
+  const tickRef = useRef(0);
+  const rafRef = useRef(null);
+  const [, forceUpdate] = useState(0);
 
   // Compass
   useEffect(() => {
@@ -19,10 +21,19 @@ export default function NearbyOverlay({ capsules, userLat, userLng, onSelect }) 
     };
   }, []);
 
-  // Slow animation tick (10fps — subtle, not distracting)
+  // Animation loop via rAF — only re-renders at ~10fps to keep it subtle
   useEffect(() => {
-    const interval = setInterval(() => setTick(Date.now()), 100);
-    return () => clearInterval(interval);
+    let lastFrame = 0;
+    const loop = (now) => {
+      rafRef.current = requestAnimationFrame(loop);
+      // Throttle to ~10fps (100ms between frames)
+      if (now - lastFrame < 100) return;
+      lastFrame = now;
+      tickRef.current = now;
+      forceUpdate((n) => n + 1);
+    };
+    rafRef.current = requestAnimationFrame(loop);
+    return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); };
   }, []);
 
   const nearby = (capsules || []).filter((c) =>
@@ -55,9 +66,10 @@ export default function NearbyOverlay({ capsules, userLat, userLng, onSelect }) 
         const glow = `rgba(${baseColor.join(',')}, ${0.2 + closeness * 0.2})`;
 
         // Subtle animation (slow, steady — easy to tap)
-        const phase = (tick / 3000 + idx * 1.7) % (Math.PI * 2);
+        const t = tickRef.current;
+        const phase = (t / 3000 + idx * 1.7) % (Math.PI * 2);
         const floatY = Math.sin(phase) * 1.5; // minimal float
-        const ringRotation = (tick / 200 + idx * 40) % 360; // slow spin
+        const ringRotation = (t / 200 + idx * 40) % 360; // slow spin
         const pulseScale = 1 + Math.sin(phase * 2) * 0.03; // barely breathing
 
         return (

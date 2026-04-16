@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 /**
  * PortalAnimation — Cinematic dimensional rift opening.
@@ -28,7 +28,7 @@ export default function PortalAnimation({ onComplete }) {
     return () => cancelAnimationFrame(raf);
   }, [onComplete]);
 
-  const p = t / 3500; // 0→1 normalized progress
+  const _p = t / 3500; // 0→1 normalized progress
 
   // Easing helpers
   const easeOut = (x) => 1 - Math.pow(1 - x, 3);

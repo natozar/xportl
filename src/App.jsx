@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import AuthGate from './components/AuthGate';
 import TosModal from './components/TosModal';
 import LocationDisclaimer from './components/LocationDisclaimer';
@@ -6,9 +6,7 @@ import PermissionGate from './components/PermissionGate';
 import ARScene from './components/ARScene';
 import Radar from './components/Radar';
 import LeaveTraceButton from './components/LeaveTraceButton';
-import CreatePost from './components/CreatePost';
 import PortalAnimation from './components/PortalAnimation';
-import DebugPanel from './components/DebugPanel';
 import CapsuleModal from './components/CapsuleModal';
 import VortexModal from './components/VortexModal';
 import VibePing from './components/VibePing';
@@ -23,6 +21,7 @@ import SettingsPage from './components/SettingsPage';
 import { useGeolocation } from './hooks/useGeolocation';
 import { useCamera } from './hooks/useCamera';
 import { usePwaInstall } from './hooks/usePwaInstall';
+import { useCompassHeading } from './hooks/useCompassHeading';
 import { createCapsule, getNearbyCapsules, subscribeToCapsuleChanges, haversineDistance } from './services/capsules';
 import { createPing } from './services/pings';
 import { clusterCapsules } from './services/clustering';
@@ -49,19 +48,7 @@ const SCAN_RADIUS = 500; // 500m for testing, reduce to 50-100m for production
 // not at a random bearing. Falls back to random if compass unavailable.
 // Distance adapts to GPS accuracy: high accuracy = closer, low = farther.
 
-let _lastHeading = null;
-
-// Listen for device orientation to get compass heading
-if (typeof window !== 'undefined') {
-  const headingHandler = (e) => {
-    // webkitCompassHeading (iOS) or alpha (Android)
-    _lastHeading = e.webkitCompassHeading ?? (e.alpha !== null ? (360 - e.alpha) % 360 : null);
-  };
-  window.addEventListener('deviceorientationabsolute', headingHandler, true);
-  window.addEventListener('deviceorientation', headingHandler, true);
-}
-
-function smartPlaceCoord(lat, lng, accuracy) {
+function smartPlaceCoord(lat, lng, accuracy, headingDeg) {
   // Place capsule exactly where the user is standing.
   // No random offset — NearbyOverlay handles visualization.
   // A tiny nudge (0.3m) in compass direction prevents AR.js
@@ -70,7 +57,6 @@ function smartPlaceCoord(lat, lng, accuracy) {
 
   // Direction: use compass heading (where user is pointing the phone)
   // Fall back to random if compass not available
-  const headingDeg = _lastHeading;
   const bearing = headingDeg !== null
     ? (headingDeg * Math.PI) / 180
     : Math.random() * 2 * Math.PI;
@@ -102,14 +88,18 @@ export default function App() {
   // ── App state ──
   const geo = useGeolocation();
   const cam = useCamera();
+  const { getHeading } = useCompassHeading();
+
+  // Synchronous lock to prevent double-tap race condition on capsule creation
+  const savingLockRef = useRef(false);
   // ready is persisted in localStorage — survives re-renders, React strict mode,
   // TOKEN_REFRESHED, profile refetches, and any other state fluctuation.
   // Only a full page reload or logout clears it.
   const [ready, setReady] = useState(() => localStorage.getItem('xportl_ready') === '1');
   const [saving, setSaving] = useState(false);
   const [nearbyCapsules, setNearbyCapsules] = useState([]);
-  const [lastScan, setLastScan] = useState(null);
-  const [supabaseOk, setSupabaseOk] = useState(null);
+  const [, setLastScan] = useState(null);
+  const [, setSupabaseOk] = useState(null);
   const [selectedCapsule, setSelectedCapsule] = useState(null);
   const [selectedVortex, setSelectedVortex] = useState(null);
   const [activePings, setActivePings] = useState([]);
@@ -118,7 +108,7 @@ export default function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [xpEvent, setXpEvent] = useState(null);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
-  const [showCreatePost, setShowCreatePost] = useState(false);
+  // showCreatePost removed — using LeaveTraceButton FAB instead
   const [showPortalAnimation, setShowPortalAnimation] = useState(false);
   const [scanVersion, setScanVersion] = useState(0);
 
@@ -245,7 +235,7 @@ export default function App() {
 
     loadProfile();
     return () => { cancelled = true; };
-  }, [session?.user?.id]);
+  }, [session?.user?.id, ready]);
 
   // ── Handle ToS acceptance ──
   const handleAcceptTos = async () => {
@@ -280,6 +270,8 @@ export default function App() {
 
   useEffect(() => {
     if (permissionsGranted && legalGatesCleared && !ready) markReady();
+    // markReady is stable (only depends on ready which is already listed)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [permissionsGranted, legalGatesCleared, ready]);
 
   // ── Polling ──
@@ -389,7 +381,11 @@ export default function App() {
 
   // ── Leave Trace (with all compliance checks) ──
   const handleLeaveTrace = useCallback(async ({ unlockDate, message, mediaBlob, mediaType, viewsLeft, visibilityLayer }) => {
-    if (saving || geo.lat === null || !session?.user?.id) return;
+    if (savingLockRef.current || geo.lat === null || !session?.user?.id) {
+      if (geo.lat === null) alert('Aguardando sinal GPS... Tente novamente em instantes.');
+      return;
+    }
+    savingLockRef.current = true;
 
     const body = (message && message.trim()) || 'Estive aqui!';
 
@@ -442,7 +438,7 @@ export default function App() {
       // Place capsule at user's exact GPS coordinates.
       // The NearbyOverlay compass system handles visualization.
       // Slight offset (1m in look direction) prevents exact-zero-distance rendering.
-      const plant = smartPlaceCoord(geo.lat, geo.lng, geo.accuracy);
+      const plant = smartPlaceCoord(geo.lat, geo.lng, geo.accuracy, getHeading());
       await createCapsule({
         lat: plant.lat,
         lng: plant.lng,
@@ -506,8 +502,9 @@ export default function App() {
       alert('Falha ao criar capsula:\n' + msg);
     } finally {
       setSaving(false);
+      savingLockRef.current = false;
     }
-  }, [geo.lat, geo.lng, geo.altitude, saving, session]);
+  }, [geo.lat, geo.lng, geo.altitude, geo.accuracy, session, profile, getHeading]);
 
   // ── Quick Ping ──
   const handleVibePing = useCallback(async (emoji) => {

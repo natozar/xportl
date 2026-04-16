@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 
 /**
  * XP Toast — animated notification when user earns XP.
@@ -12,6 +12,8 @@ export default function XPToast({ event, onDone }) {
     setVisible(true);
     const t = setTimeout(() => { setVisible(false); setTimeout(onDone, 300); }, 3000);
     return () => clearTimeout(t);
+    // onDone is stable (defined inline in parent), safe to omit
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [event]);
 
   if (!event) return null;

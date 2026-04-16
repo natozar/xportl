@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { supabase } from '../../services/supabase';
 
 let L = null;
@@ -94,7 +94,7 @@ export default function CapsuleMap() {
         const isGhost = cap.visibility_layer === 'ghost';
         const isPrivate = cap.visibility_layer === 'private';
         const isLocked = cap.unlock_date && new Date(cap.unlock_date) > new Date();
-        const hasMedia = !!cap.media_url;
+        const _hasMedia = !!cap.media_url;
 
         const color = isRemoved ? '#ff3366' : isFlagged ? '#ffaa00' : isLocked ? '#b44aff' : isGhost ? '#b44aff' : isPrivate ? '#00e5ff' : '#00ff88';
         const opacity = isRemoved ? 0.3 : 1;
@@ -127,7 +127,7 @@ export default function CapsuleMap() {
 
     return () => {
       cancelled = true;
-      try { mapRef.current?.remove(); mapRef.current = null; } catch (_e) { /* cleanup */ }
+      try { mapRef.current?.remove(); mapRef.current = null; } catch (_) { /* cleanup */ }
     };
   }, [loading, capsules]);
 

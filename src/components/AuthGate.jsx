@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import {
   signInWithGoogle,
   signUpWithEmail, signInWithEmail,
@@ -9,7 +9,7 @@ export default function AuthGate() {
   const [mode, setMode] = useState('main'); // main | email | phone | verify-email | verify-phone
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [success, setSuccess] = useState(null);
+  const [_success, setSuccess] = useState(null);
 
   // Email state
   const [email, setEmail] = useState('');

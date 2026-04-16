@@ -20,6 +20,14 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 <meta name="theme-color" content="#07040F" />
+<meta http-equiv="Content-Security-Policy" content="
+  default-src 'self';
+  script-src 'self' 'unsafe-inline';
+  style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
+  font-src 'self' https://fonts.gstatic.com;
+  img-src 'self' data:;
+  connect-src 'self';
+" />
 <title>XPortl — O mundo real agora tem portais</title>
 <meta name="description" content="A primeira rede social em realidade aumentada ancorada em coordenadas reais. Deixe cápsulas do tempo. Encontre rastros de quem passou antes." />
 

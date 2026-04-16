@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { isCapsuleLocked, isGhostCapsule, getTimeRemaining, haptic, consumeView, selfDestruct } from '../services/capsules';
 
 export default function CapsuleModal({ capsule, onClose, onSelfDestruct, onReport }) {
@@ -30,7 +30,7 @@ export default function CapsuleModal({ capsule, onClose, onSelfDestruct, onRepor
       consumeView(capsule.id).then((r) => setViewsLeft(r?.views_left ?? null)).catch(() => {});
     }
     haptic([60, 30, 60]);
-  }, [capsule?.id, locked]);
+  }, [capsule, locked]);
 
   // Early return AFTER all hooks
   if (!capsule) return null;

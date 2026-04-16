@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 export default function PermissionGate({ geo, cam, onComplete }) {
   const [step, setStep] = useState('welcome');
