@@ -12,6 +12,14 @@ export function registerXPortlComponents() {
 
   if (AFRAME.components['capsule-data']) return;
 
+  // ── fixed-altitude: locks entity Y to a fixed height regardless of GPS altitude ──
+  AFRAME.registerComponent('fixed-altitude', {
+    schema: { y: { type: 'number', default: 0 } },
+    tick() {
+      this.el.object3D.position.y = this.data.y;
+    },
+  });
+
   // ── capsule-data: click handler + haptic feedback ──
   AFRAME.registerComponent('capsule-data', {
     schema: {

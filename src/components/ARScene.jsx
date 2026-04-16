@@ -149,18 +149,21 @@ export default function ARScene({ capsules, pings, onCapsuleClick, onVortexClick
         }
       }
 
-      // Add singles
-      singles.forEach((cap) => {
+      // Add singles — spread altitude so nearby capsules don't overlap
+      singles.forEach((cap, i) => {
         if (existing.has(cap.id)) return;
-        const el = buildCapsuleEntity(cap);
+        // Stagger Y between -1m and +3m so capsules fan out vertically
+        const altY = (i % 5) * 1.0 - 1;
+        const el = buildCapsuleEntity(cap, altY);
         scene.appendChild(el);
         existing.set(cap.id, el);
       });
 
-      // Add vortexes
-      vortexes.forEach((vortex) => {
+      // Add vortexes — slightly elevated above singles
+      vortexes.forEach((vortex, i) => {
         if (existing.has(vortex.id)) return;
-        const el = buildVortexEntity(vortex);
+        const altY = 1 + (i % 3) * 1.5;
+        const el = buildVortexEntity(vortex, altY);
         scene.appendChild(el);
         existing.set(vortex.id, el);
       });
@@ -242,13 +245,15 @@ export default function ARScene({ capsules, pings, onCapsuleClick, onVortexClick
 // The portal visual is: soft outer halo -> main sphere (emissive body) ->
 // bright pulsing core -> two crossed orbital rings. The emissive floor is
 // bumped up so the portal reads as a light source even in daylight.
-function buildCapsuleEntity(cap) {
+function buildCapsuleEntity(cap, altitudeY = 0) {
   const locked = isCapsuleLocked(cap);
   const pal = locked ? COLORS.locked : COLORS.unlocked;
 
   const wrapper = document.createElement('a-entity');
   wrapper.setAttribute('gps-entity-place', `latitude: ${cap.lat}; longitude: ${cap.lng};`);
   wrapper.setAttribute('look-at', '[gps-camera]');
+  // Lock to a fixed altitude so capsules appear at eye level, not in the sky
+  wrapper.setAttribute('fixed-altitude', `y: ${altitudeY}`);
 
   // Outer halo: low-opacity large sphere that sells the "glow" in daylight
   const halo = document.createElement('a-sphere');
@@ -317,12 +322,13 @@ function buildCapsuleEntity(cap) {
 }
 
 // ── Build a Vortex entity (cluster of 3+ capsules) ──
-function buildVortexEntity(vortex) {
+function buildVortexEntity(vortex, altitudeY = 0) {
   const pal = COLORS.vortex;
 
   const wrapper = document.createElement('a-entity');
   wrapper.setAttribute('gps-entity-place', `latitude: ${vortex.lat}; longitude: ${vortex.lng};`);
   wrapper.setAttribute('look-at', '[gps-camera]');
+  wrapper.setAttribute('fixed-altitude', `y: ${altitudeY}`);
 
   // ── Octahedron core ──
   const octa = document.createElement('a-octahedron');

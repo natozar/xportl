@@ -58,6 +58,13 @@ export default function NearbyOverlay({ capsules, userLat, userLng, onSelect }) 
         const locked = isCapsuleLocked(cap);
         const ghost = isGhostCapsule(cap);
 
+        // Distribute vertically: closer capsules sit lower (more centered),
+        // farther ones higher. Stagger by index to avoid overlap.
+        const distBand = Math.min(dist / 500, 1); // 0=close, 1=far
+        const verticalBase = 30 + distBand * 25; // 30%-55% from top
+        const stagger = (idx % 5) * 8; // offset each by 8%
+        const screenY = verticalBase + stagger;
+
         // Visual properties based on distance
         const closeness = Math.max(0, 1 - dist / 500);
         const size = 40 + closeness * 16; // 40-56px (smaller, cleaner)
@@ -78,7 +85,8 @@ export default function NearbyOverlay({ capsules, userLat, userLng, onSelect }) 
             style={{
               ...s.portal,
               left: `${screenX}%`,
-              transform: `translateX(-50%) translateY(${floatY}px)`,
+              top: `${screenY}%`,
+              transform: `translate(-50%, -50%) translateY(${floatY}px)`,
               width: size, height: size + 30,
             }}
             onClick={() => onSelect(cap)}
@@ -162,14 +170,13 @@ const s = {
     position: 'fixed',
     top: 'calc(10px + env(safe-area-inset-top, 0px))',
     left: 0, right: 0,
-    height: '55%',
+    height: '75%',
     zIndex: 10000,
     pointerEvents: 'none',
     overflow: 'visible',
   },
   portal: {
     position: 'absolute',
-    top: '25%',
     display: 'flex', flexDirection: 'column', alignItems: 'center',
     justifyContent: 'center',
     background: 'none', border: 'none',
