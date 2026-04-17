@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { isCapsuleLocked, isGhostCapsule } from '../services/capsules';
+import { isCapsuleLocked, isGhostCapsule, getRarity, getCapsuleType } from '../services/capsules';
 
-// Leaflet is loaded dynamically to avoid blocking initial bundle
 let L = null;
 let leafletLoaded = false;
 
@@ -9,8 +8,6 @@ async function loadLeaflet() {
   if (leafletLoaded) return L;
   const module = await import('leaflet');
   L = module.default || module;
-
-  // Inject Leaflet CSS (only once)
   if (!document.getElementById('leaflet-css')) {
     const link = document.createElement('link');
     link.id = 'leaflet-css';
@@ -18,40 +15,50 @@ async function loadLeaflet() {
     link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
     document.head.appendChild(link);
   }
-
   leafletLoaded = true;
   return L;
 }
 
-// Custom SVG markers (no external images needed)
+// ── Filters ──
+const FILTER_RARITY = ['all', 'rare', 'legendary', 'mythic'];
+const FILTER_TYPE = ['all', 'echo', 'chain', 'challenge', 'collab', 'auction'];
+
 function createMarkerIcon(leaflet, capsule) {
   const locked = isCapsuleLocked(capsule);
   const ghost = isGhostCapsule(capsule);
-  const color = locked ? '#b44aff' : ghost ? '#b44aff' : '#00f0ff';
-  const glow = locked ? '180,74,255' : '0,240,255';
+  const rarity = getRarity(capsule);
+  const useRarityColor = rarity.key !== 'common';
+
+  const color = useRarityColor ? rarity.color : locked ? '#b44aff' : ghost ? '#b44aff' : '#00f0ff';
+  const size = useRarityColor ? Math.round(28 + (rarity.scale - 1) * 24) : 28;
+  const glowSize = size + 12;
+  const coreSize = Math.round(size * 0.35);
+
+  // Mythic/legendary get animated pulse, others static
+  const animate = rarity.key === 'mythic' || rarity.key === 'legendary';
 
   return leaflet.divIcon({
     className: '',
-    iconSize: [32, 32],
-    iconAnchor: [16, 16],
+    iconSize: [glowSize, glowSize],
+    iconAnchor: [glowSize / 2, glowSize / 2],
     html: `
-      <div style="
-        width:32px; height:32px; position:relative;
-        display:flex; align-items:center; justify-content:center;
-      ">
+      <div style="width:${glowSize}px;height:${glowSize}px;position:relative;display:flex;align-items:center;justify-content:center;">
         <div style="
-          position:absolute; inset:0; border-radius:50%;
-          background:rgba(${glow},0.15);
-          border:2px solid ${color};
-          box-shadow:0 0 12px rgba(${glow},0.4);
-          animation: pulse-ring 2s ease-out infinite;
+          position:absolute;inset:0;border-radius:50%;
+          background:radial-gradient(circle, ${color}25 0%, transparent 70%);
+          border:1.5px solid ${color}${useRarityColor ? '66' : '33'};
+          ${animate ? 'animation:pulse-ring 2s ease-out infinite;' : ''}
         "></div>
         <div style="
-          width:10px; height:10px; border-radius:50%;
-          background:${color};
-          box-shadow:0 0 8px ${color};
-          position:relative; z-index:2;
+          width:${coreSize}px;height:${coreSize}px;border-radius:50%;
+          background:${color};box-shadow:0 0 ${useRarityColor ? 12 : 6}px ${color};
+          position:relative;z-index:2;
         "></div>
+        ${rarity.key !== 'common' ? `<div style="
+          position:absolute;bottom:-2px;left:50%;transform:translateX(-50%);
+          font-size:8px;white-space:nowrap;color:${color};font-weight:700;
+          text-shadow:0 0 4px rgba(0,0,0,0.8);letter-spacing:0.04em;
+        ">${rarity.icon}</div>` : ''}
       </div>
     `,
   });
@@ -62,13 +69,7 @@ function createUserIcon(leaflet) {
     className: '',
     iconSize: [20, 20],
     iconAnchor: [10, 10],
-    html: `
-      <div style="
-        width:20px; height:20px; border-radius:50%;
-        background:#00f0ff; border:3px solid #0d0a1a;
-        box-shadow:0 0 12px rgba(0,240,255,0.6);
-      "></div>
-    `,
+    html: `<div style="width:20px;height:20px;border-radius:50%;background:#00f0ff;border:3px solid #0d0a1a;box-shadow:0 0 12px rgba(0,240,255,0.6);"></div>`,
   });
 }
 
@@ -76,13 +77,39 @@ export default function MapView({ lat, lng, capsules, onSelectCapsule }) {
   const mapContainerRef = useRef(null);
   const mapRef = useRef(null);
   const markersRef = useRef([]);
+  const heatRef = useRef([]);
   const userMarkerRef = useRef(null);
   const [loading, setLoading] = useState(true);
+  const [filterRarity, setFilterRarity] = useState('all');
+  const [filterType, setFilterType] = useState('all');
+  const [showFilters, setShowFilters] = useState(false);
 
-  // Initialize map immediately (don't wait for GPS — will recenter when GPS arrives)
+  // Filter capsules
+  const filtered = (capsules || []).filter((c) => {
+    if (c.content?.type === 'ping') return false;
+    if (filterRarity !== 'all' && (c.rarity || 'common') !== filterRarity) return false;
+    if (filterType !== 'all' && (c.capsule_type || 'standard') !== filterType) return false;
+    return true;
+  });
+
+  // Ghost capsules: show approximate zone, not exact position
+  const visibleCapsules = filtered.map((c) => {
+    if (isGhostCapsule(c)) {
+      // Jitter position slightly so exact location is hidden
+      const jitter = 0.0002; // ~22m randomness
+      return {
+        ...c,
+        _displayLat: c.lat + (Math.random() - 0.5) * jitter,
+        _displayLng: c.lng + (Math.random() - 0.5) * jitter,
+        _isGhostBlurred: true,
+      };
+    }
+    return { ...c, _displayLat: c.lat, _displayLng: c.lng };
+  });
+
+  // Init map
   useEffect(() => {
     if (!mapContainerRef.current || mapRef.current) return;
-
     let cancelled = false;
 
     (async () => {
@@ -90,22 +117,18 @@ export default function MapView({ lat, lng, capsules, onSelectCapsule }) {
       if (cancelled || mapRef.current) return;
 
       const map = leaflet.map(mapContainerRef.current, {
-        center: [lat || -21.17, lng || -47.81],  // fallback to Ribeirao Preto
+        center: [lat || -21.17, lng || -47.81],
         zoom: lat ? 17 : 12,
         zoomControl: false,
         attributionControl: false,
       });
 
-      // Dark tile layer (CartoDB dark matter — free, no API key)
       leaflet.tileLayer(
         'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
         { maxZoom: 20, subdomains: 'abcd' }
       ).addTo(map);
 
-      // Zoom control bottom-right
       leaflet.control.zoom({ position: 'bottomright' }).addTo(map);
-
-      // Attribution minimal
       leaflet.control.attribution({ position: 'bottomright', prefix: false })
         .addAttribution('&copy; <a href="https://carto.com">CARTO</a>')
         .addTo(map);
@@ -116,14 +139,7 @@ export default function MapView({ lat, lng, capsules, onSelectCapsule }) {
 
     return () => {
       cancelled = true;
-      try {
-        if (mapRef.current) {
-          mapRef.current.remove();
-          mapRef.current = null;
-        }
-      } catch (_) {
-        mapRef.current = null;
-      }
+      try { if (mapRef.current) { mapRef.current.remove(); mapRef.current = null; } } catch (_) { mapRef.current = null; }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -135,7 +151,6 @@ export default function MapView({ lat, lng, capsules, onSelectCapsule }) {
 
     (async () => {
       const leaflet = await loadLeaflet();
-
       if (userMarkerRef.current) {
         userMarkerRef.current.setLatLng([lat, lng]);
       } else {
@@ -144,12 +159,11 @@ export default function MapView({ lat, lng, capsules, onSelectCapsule }) {
           zIndexOffset: 1000,
         }).addTo(map);
       }
-
       map.setView([lat, lng], map.getZoom(), { animate: true });
     })();
   }, [lat, lng]);
 
-  // Sync capsule markers
+  // Sync markers + heat zones
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
@@ -157,77 +171,115 @@ export default function MapView({ lat, lng, capsules, onSelectCapsule }) {
     (async () => {
       const leaflet = await loadLeaflet();
 
-      // Clear old markers
+      // Clear old
       markersRef.current.forEach((m) => map.removeLayer(m));
       markersRef.current = [];
+      heatRef.current.forEach((h) => map.removeLayer(h));
+      heatRef.current = [];
 
-      // Add new markers
-      capsules.forEach((cap) => {
-        if (cap.content?.type === 'ping') return; // Skip ephemeral pings
+      // ── Heat zones (density circles) ──
+      // Group capsules into ~100m grid cells and draw glow circles
+      const grid = {};
+      const cellSize = 0.001; // ~111m
+      capsules.forEach((c) => {
+        if (c.content?.type === 'ping') return;
+        const key = `${Math.round(c.lat / cellSize)}_${Math.round(c.lng / cellSize)}`;
+        if (!grid[key]) grid[key] = { lat: 0, lng: 0, count: 0 };
+        grid[key].lat += c.lat;
+        grid[key].lng += c.lng;
+        grid[key].count += 1;
+      });
 
-        const marker = leaflet.marker([cap.lat, cap.lng], {
+      Object.values(grid).forEach((cell) => {
+        if (cell.count < 2) return; // Only show for clusters
+        const cLat = cell.lat / cell.count;
+        const cLng = cell.lng / cell.count;
+        const intensity = Math.min(cell.count / 10, 1);
+        const radius = 40 + cell.count * 8;
+
+        const circle = leaflet.circle([cLat, cLng], {
+          radius,
+          color: 'transparent',
+          fillColor: `rgba(0,240,255,${0.03 + intensity * 0.08})`,
+          fillOpacity: 1,
+          weight: 0,
+          interactive: false,
+        }).addTo(map);
+        heatRef.current.push(circle);
+      });
+
+      // ── Scan radius ──
+      if (lat && lng) {
+        const scanCircle = leaflet.circle([lat, lng], {
+          radius: 500,
+          color: 'rgba(0,240,255,0.12)',
+          fillColor: 'rgba(0,240,255,0.02)',
+          fillOpacity: 1,
+          weight: 1,
+          dashArray: '8,6',
+          interactive: false,
+        }).addTo(map);
+        heatRef.current.push(scanCircle);
+      }
+
+      // ── Capsule markers ──
+      visibleCapsules.forEach((cap) => {
+        const rarity = getRarity(cap);
+        const cType = getCapsuleType(cap);
+        const locked = isCapsuleLocked(cap);
+        const ghost = cap._isGhostBlurred;
+
+        const marker = leaflet.marker([cap._displayLat, cap._displayLng], {
           icon: createMarkerIcon(leaflet, cap),
+          zIndexOffset: rarity.key === 'mythic' ? 500 : rarity.key === 'legendary' ? 300 : rarity.key === 'rare' ? 100 : 0,
         });
 
-        // Popup with capsule info
-        const locked = isCapsuleLocked(cap);
+        // Popup: no content preview — just metadata to build curiosity
         const dist = cap.distance_meters !== undefined ? `${cap.distance_meters.toFixed(0)}m` : '?';
+        const rarityBadge = rarity.key !== 'common'
+          ? `<span style="color:${rarity.color};font-weight:700;font-size:10px;">${rarity.icon} ${rarity.label}</span>`
+          : '';
+        const typeBadge = cType.key !== 'standard'
+          ? `<span style="color:rgba(255,255,255,0.4);font-size:10px;">${cType.icon} ${cType.label}</span>`
+          : '';
+
         const popupHtml = `
           <div style="
-            background:rgba(19,16,42,0.95); color:#e8e8f0; padding:10px 14px;
-            border-radius:10px; border:1px solid rgba(0,240,255,0.15);
-            backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px);
-            font-family:-apple-system,sans-serif; font-size:12px;
-            min-width:140px; box-shadow:0 4px 20px rgba(0,0,0,0.5);
+            background:rgba(14,11,24,0.95);color:#e8e8f0;padding:10px 14px;
+            border-radius:12px;border:1px solid ${rarity.key !== 'common' ? rarity.color + '33' : 'rgba(0,240,255,0.12)'};
+            backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+            font-family:-apple-system,sans-serif;font-size:12px;
+            min-width:150px;box-shadow:0 4px 24px rgba(0,0,0,0.6);
           ">
-            <div style="font-weight:700; color:${locked ? '#b44aff' : '#00f0ff'}; font-size:11px; letter-spacing:0.1em; margin-bottom:4px;">
-              ${locked ? 'TRANCADA' : 'PORTAL'}
+            <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
+              ${rarityBadge}
+              ${typeBadge}
+              ${locked ? '<span style="color:#b44aff;font-size:10px;">🔒 Trancada</span>' : ''}
+              ${ghost ? '<span style="color:#b44aff;font-size:10px;">👻 ~zona</span>' : ''}
             </div>
-            <div style="color:#aaa; font-size:11px; margin-bottom:6px;">
-              ${locked ? 'Trava temporal ativa' : (cap.content?.body?.slice(0, 40) || '...')}
-            </div>
-            <div style="display:flex; justify-content:space-between; align-items:center;">
-              <span style="color:rgba(255,255,255,0.3); font-size:10px;">${dist}</span>
-              <span style="color:#00f0ff; font-size:10px; font-weight:600; cursor:pointer;" id="map-open-${cap.id}">
-                ${locked ? 'Ver' : 'Abrir'} →
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <span style="color:rgba(255,255,255,0.25);font-size:10px;">${dist}</span>
+              <span style="color:#00f0ff;font-size:10px;font-weight:600;cursor:pointer;" id="map-open-${cap.id}">
+                Explorar →
               </span>
             </div>
           </div>
         `;
 
-        marker.bindPopup(popupHtml, {
-          closeButton: false,
-          className: 'xportl-popup',
-          offset: [0, -10],
-        });
-
+        marker.bindPopup(popupHtml, { closeButton: false, className: 'xportl-popup', offset: [0, -10] });
         marker.on('popupopen', () => {
           const btn = document.getElementById(`map-open-${cap.id}`);
-          if (btn) {
-            btn.onclick = () => {
-              map.closePopup();
-              onSelectCapsule(cap);
-            };
-          }
+          if (btn) btn.onclick = () => { map.closePopup(); onSelectCapsule(cap); };
         });
 
         marker.addTo(map);
         markersRef.current.push(marker);
       });
-
-      // Draw 50m radius circle
-      markersRef.current.push(
-        leaflet.circle([lat || -23.55, lng || -46.63], {
-          radius: 50,
-          color: 'rgba(0,240,255,0.2)',
-          fillColor: 'rgba(0,240,255,0.04)',
-          fillOpacity: 1,
-          weight: 1,
-          dashArray: '6,4',
-        }).addTo(map)
-      );
     })();
-  }, [capsules, lat, lng]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visibleCapsules.length, filterRarity, filterType, lat, lng]);
+
+  const activeFilters = (filterRarity !== 'all' ? 1 : 0) + (filterType !== 'all' ? 1 : 0);
 
   return (
     <div style={s.container}>
@@ -240,25 +292,92 @@ export default function MapView({ lat, lng, capsules, onSelectCapsule }) {
         </div>
       )}
 
-      {/* Header overlay */}
+      {/* Header */}
       <div style={s.header}>
-        <span style={s.headerTitle}>MAPA DE PORTAIS</span>
-        <span style={s.headerCount}>{capsules.filter((c) => c.content?.type !== 'ping').length} portais</span>
+        <div>
+          <span style={s.headerTitle}>RADAR</span>
+          <span style={s.headerCount}>{filtered.length} portais</span>
+        </div>
+        <button
+          style={{
+            ...s.filterBtn,
+            ...(activeFilters > 0 ? { borderColor: 'rgba(0,240,255,0.3)', color: '#00f0ff' } : {}),
+          }}
+          onClick={() => setShowFilters(!showFilters)}
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+            <line x1="4" y1="6" x2="20" y2="6" /><line x1="8" y1="12" x2="16" y2="12" /><line x1="11" y1="18" x2="13" y2="18" />
+          </svg>
+          {activeFilters > 0 && <span style={s.filterBadge}>{activeFilters}</span>}
+        </button>
       </div>
+
+      {/* Filter panel */}
+      {showFilters && (
+        <div style={s.filterPanel}>
+          <div style={s.filterSection}>
+            <span style={s.filterLabel}>RARIDADE</span>
+            <div style={s.filterRow}>
+              {FILTER_RARITY.map((r) => (
+                <button
+                  key={r}
+                  style={{
+                    ...s.filterPill,
+                    ...(filterRarity === r ? { background: 'rgba(0,240,255,0.1)', borderColor: 'rgba(0,240,255,0.3)', color: '#00f0ff' } : {}),
+                  }}
+                  onClick={() => setFilterRarity(r)}
+                >
+                  {r === 'all' ? 'Todas' : getRarity({ rarity: r }).icon + ' ' + getRarity({ rarity: r }).label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div style={s.filterSection}>
+            <span style={s.filterLabel}>TIPO</span>
+            <div style={s.filterRow}>
+              {FILTER_TYPE.map((t) => (
+                <button
+                  key={t}
+                  style={{
+                    ...s.filterPill,
+                    ...(filterType === t ? { background: 'rgba(0,240,255,0.1)', borderColor: 'rgba(0,240,255,0.3)', color: '#00f0ff' } : {}),
+                  }}
+                  onClick={() => setFilterType(t)}
+                >
+                  {t === 'all' ? 'Todos' : getCapsuleType({ capsule_type: t }).icon + ' ' + getCapsuleType({ capsule_type: t }).label}
+                </button>
+              ))}
+            </div>
+          </div>
+          {activeFilters > 0 && (
+            <button style={s.clearFilters} onClick={() => { setFilterRarity('all'); setFilterType('all'); }}>
+              Limpar filtros
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Legend */}
       <div style={s.legend}>
         <div style={s.legendItem}>
           <div style={{ ...s.legendDot, background: '#00f0ff' }} />
-          <span>Aberto</span>
+          <span>Comum</span>
         </div>
         <div style={s.legendItem}>
-          <div style={{ ...s.legendDot, background: '#b44aff' }} />
-          <span>Trancado / Ghost</span>
+          <div style={{ ...s.legendDot, background: '#3b82f6' }} />
+          <span>Rara</span>
         </div>
         <div style={s.legendItem}>
-          <div style={{ ...s.legendDot, background: '#00f0ff', border: '2px solid #0d0a1a' }} />
-          <span>Voce</span>
+          <div style={{ ...s.legendDot, background: '#f59e0b' }} />
+          <span>Lendaria</span>
+        </div>
+        <div style={s.legendItem}>
+          <div style={{ ...s.legendDot, background: '#ec4899' }} />
+          <span>Mitica</span>
+        </div>
+        <div style={s.legendItem}>
+          <div style={{ ...s.legendDot, background: 'rgba(0,240,255,0.15)', border: '1px dashed rgba(0,240,255,0.3)' }} />
+          <span>Zona quente</span>
         </div>
       </div>
     </div>
@@ -267,14 +386,11 @@ export default function MapView({ lat, lng, capsules, onSelectCapsule }) {
 
 const s = {
   container: {
-    position: 'fixed', inset: 0,
-    zIndex: 50, pointerEvents: 'auto',
+    position: 'fixed', inset: 0, zIndex: 50, pointerEvents: 'auto',
     background: '#0d0a1a',
     paddingBottom: 'calc(60px + env(safe-area-inset-bottom, 0px))',
   },
-  map: {
-    width: '100%', height: '100%',
-  },
+  map: { width: '100%', height: '100%' },
   loading: {
     position: 'absolute', inset: 0, zIndex: 10,
     display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
@@ -285,35 +401,68 @@ const s = {
     border: '2px solid rgba(0,240,255,0.15)', borderTopColor: '#00f0ff',
     animation: 'spin 0.8s linear infinite',
   },
-  loadingText: {
-    fontSize: '0.65rem', color: 'rgba(255,255,255,0.4)', letterSpacing: '0.15em',
-  },
+  loadingText: { fontSize: '0.65rem', color: 'rgba(255,255,255,0.4)', letterSpacing: '0.15em' },
   header: {
     position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10,
     padding: 'calc(14px + env(safe-area-inset-top, 0px)) 16px 10px',
-    background: 'linear-gradient(to bottom, rgba(13,10,26,0.9) 60%, transparent)',
+    background: 'linear-gradient(to bottom, rgba(13,10,26,0.92) 60%, transparent)',
     display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-    pointerEvents: 'none',
   },
   headerTitle: {
     fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.2em', color: '#00f0ff',
+    marginRight: 8,
   },
-  headerCount: {
-    fontSize: '0.6rem', color: 'rgba(255,255,255,0.3)',
+  headerCount: { fontSize: '0.6rem', color: 'rgba(255,255,255,0.3)' },
+  filterBtn: {
+    display: 'flex', alignItems: 'center', gap: 4, position: 'relative',
+    padding: '6px 12px', borderRadius: 10,
+    background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)',
+    color: 'rgba(255,255,255,0.4)', fontSize: '0.6rem', fontWeight: 600, fontFamily: 'inherit',
+    touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+  },
+  filterBadge: {
+    position: 'absolute', top: -4, right: -4,
+    width: 16, height: 16, borderRadius: '50%', fontSize: '0.5rem',
+    background: '#00f0ff', color: '#0a0814', fontWeight: 700,
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+  },
+  filterPanel: {
+    position: 'absolute', top: 'calc(52px + env(safe-area-inset-top, 0px))', left: 10, right: 10,
+    zIndex: 10, padding: '12px 14px', borderRadius: 14,
+    background: 'rgba(14,11,24,0.95)', backdropFilter: 'blur(16px)',
+    border: '1px solid rgba(255,255,255,0.06)',
+    boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
+  },
+  filterSection: { marginBottom: 10 },
+  filterLabel: {
+    fontSize: '0.5rem', fontWeight: 700, letterSpacing: '0.12em',
+    color: 'rgba(255,255,255,0.2)', marginBottom: 6, display: 'block',
+  },
+  filterRow: { display: 'flex', flexWrap: 'wrap', gap: 4 },
+  filterPill: {
+    padding: '5px 10px', borderRadius: 8,
+    background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)',
+    color: 'rgba(255,255,255,0.4)', fontSize: '0.55rem', fontWeight: 600, fontFamily: 'inherit',
+    touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+    transition: 'all 0.15s',
+  },
+  clearFilters: {
+    width: '100%', padding: '8px', borderRadius: 8, marginTop: 4,
+    background: 'none', border: '1px solid rgba(255,255,255,0.06)',
+    color: 'rgba(255,255,255,0.3)', fontSize: '0.55rem', fontWeight: 600, fontFamily: 'inherit',
+    touchAction: 'manipulation',
   },
   legend: {
-    position: 'absolute', bottom: 'calc(70px + env(safe-area-inset-bottom, 0px))', left: 12,
+    position: 'absolute', bottom: 'calc(70px + env(safe-area-inset-bottom, 0px))', left: 10,
     zIndex: 10, pointerEvents: 'none',
-    display: 'flex', flexDirection: 'column', gap: 5,
+    display: 'flex', flexDirection: 'column', gap: 4,
     padding: '8px 12px', borderRadius: 10,
-    background: 'rgba(13,10,26,0.8)', backdropFilter: 'blur(12px)',
+    background: 'rgba(13,10,26,0.85)', backdropFilter: 'blur(12px)',
     border: '1px solid rgba(255,255,255,0.04)',
   },
   legendItem: {
     display: 'flex', alignItems: 'center', gap: 6,
     fontSize: '0.5rem', color: 'rgba(255,255,255,0.4)',
   },
-  legendDot: {
-    width: 8, height: 8, borderRadius: '50%', flexShrink: 0,
-  },
+  legendDot: { width: 8, height: 8, borderRadius: '50%', flexShrink: 0 },
 };
