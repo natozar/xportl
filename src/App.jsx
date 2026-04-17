@@ -18,6 +18,8 @@ import MapView from './components/MapView';
 import IndoorScene from './components/IndoorScene';
 import ProfilePage from './components/ProfilePage';
 import SettingsPage from './components/SettingsPage';
+import NotificationsPage from './components/NotificationsPage';
+import { getUnreadCount } from './services/notifications';
 import { useGeolocation } from './hooks/useGeolocation';
 import { useCamera } from './hooks/useCamera';
 import { usePwaInstall } from './hooks/usePwaInstall';
@@ -108,7 +110,7 @@ export default function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [xpEvent, setXpEvent] = useState(null);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
-  // showCreatePost removed — using LeaveTraceButton FAB instead
+  const [unreadNotifs, setUnreadNotifs] = useState(0);
   const [showPortalAnimation, setShowPortalAnimation] = useState(false);
   const [scanVersion, setScanVersion] = useState(0);
 
@@ -254,6 +256,15 @@ export default function App() {
   };
 
   // ── Permissions ──
+  // ── Poll unread notifications ──
+  useEffect(() => {
+    if (!session?.user?.id || !ready) return;
+    const check = () => getUnreadCount(session.user.id).then(setUnreadNotifs).catch(() => {});
+    check();
+    const interval = setInterval(check, 30_000);
+    return () => clearInterval(interval);
+  }, [session?.user?.id, ready]);
+
   const permissionsGranted = geo.granted && cam.granted;
   const legalGatesCleared = session && profile && !showTos && !showDisclaimer && !blocked
     && hasAcceptedTos(profile) && hasAcceptedLocationDisclaimer(profile);
@@ -620,12 +631,10 @@ export default function App() {
   // ── Tab handler (Create tab opens the creation panel via explore view) ──
   const handleTabChange = (tab) => {
     setShowSettings(false);
-    if (tab === 'create') {
-      setActiveTab('explore');
-      window.dispatchEvent(new CustomEvent('xportl:open-create'));
-    } else {
-      setActiveTab(tab);
+    if (tab === 'notifications') {
+      setUnreadNotifs(0); // optimistic clear
     }
+    setActiveTab(tab);
   };
 
   const refreshProfile = async () => {
@@ -683,6 +692,18 @@ export default function App() {
         />
       )}
 
+      {/* ── Tab: Notifications ── */}
+      {activeTab === 'notifications' && (
+        <NotificationsPage
+          userId={session.user.id}
+          onOpenCapsule={(capsuleId) => {
+            setActiveTab('explore');
+            supabase.from('capsules').select('*').eq('id', capsuleId).single()
+              .then(({ data }) => { if (data) setSelectedCapsule({ ...data, distance_meters: 0 }); });
+          }}
+        />
+      )}
+
       {/* ── Tab: Profile ── */}
       {activeTab === 'profile' && !showSettings && (
         <ProfilePage
@@ -700,7 +721,7 @@ export default function App() {
       )}
 
       {/* ── Bottom Navigation (always visible) ── */}
-      <BottomNav activeTab={activeTab} onTabChange={handleTabChange} />
+      <BottomNav activeTab={activeTab} onTabChange={handleTabChange} unreadCount={unreadNotifs} />
 
       {/* ── Modals (render on top of everything) ── */}
       <CapsuleModal

@@ -13,7 +13,7 @@ const TABS = [
   },
   {
     id: 'map',
-    label: 'Mapa',
+    label: 'Radar',
     icon: (active) => (
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
         <path d="M3 7l6-3 6 3 6-3v14l-6 3-6-3-6 3V7z" stroke={active ? '#00f0ff' : 'currentColor'} strokeWidth="1.5"
@@ -24,14 +24,13 @@ const TABS = [
     ),
   },
   {
-    id: 'create',
-    label: 'Criar',
+    id: 'notifications',
+    label: 'Alertas',
     icon: (active) => (
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-        <circle cx="12" cy="12" r="11" stroke={active ? '#00f0ff' : 'currentColor'} strokeWidth="1.5"
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+        <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9" stroke={active ? '#00f0ff' : 'currentColor'} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"
           fill={active ? 'rgba(0,240,255,0.08)' : 'none'} />
-        <line x1="12" y1="7" x2="12" y2="17" stroke={active ? '#00f0ff' : 'currentColor'} strokeWidth="2" strokeLinecap="round" />
-        <line x1="7" y1="12" x2="17" y2="12" stroke={active ? '#00f0ff' : 'currentColor'} strokeWidth="2" strokeLinecap="round" />
+        <path d="M13.73 21a2 2 0 01-3.46 0" stroke={active ? '#00f0ff' : 'currentColor'} strokeWidth="1.5" strokeLinecap="round" />
       </svg>
     ),
   },
@@ -47,7 +46,7 @@ const TABS = [
   },
 ];
 
-export default function BottomNav({ activeTab, onTabChange }) {
+export default function BottomNav({ activeTab, onTabChange, unreadCount = 0 }) {
   return (
     <nav style={s.nav}>
       {TABS.map((tab) => {
@@ -58,7 +57,14 @@ export default function BottomNav({ activeTab, onTabChange }) {
             style={{ ...s.tab, ...(active ? s.tabActive : {}) }}
             onClick={() => onTabChange(tab.id)}
           >
-            {tab.icon(active)}
+            <div style={s.iconWrap}>
+              {tab.icon(active)}
+              {tab.id === 'notifications' && unreadCount > 0 && (
+                <div style={s.badge}>
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </div>
+              )}
+            </div>
             <span style={{ ...s.label, ...(active ? s.labelActive : {}) }}>
               {tab.label}
             </span>
@@ -104,8 +110,17 @@ const s = {
     WebkitTapHighlightColor: 'transparent',
     pointerEvents: 'auto',
   },
-  tabActive: {
-    color: '#00f0ff',
+  tabActive: { color: '#00f0ff' },
+  iconWrap: { position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' },
+  badge: {
+    position: 'absolute', top: -5, right: -8,
+    minWidth: 16, height: 16, borderRadius: 8,
+    background: '#ff3366', color: '#fff',
+    fontSize: '0.5rem', fontWeight: 800,
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    padding: '0 4px',
+    boxShadow: '0 0 8px rgba(255,51,102,0.5)',
+    border: '2px solid rgba(5,3,12,0.9)',
   },
   label: {
     fontSize: '0.55rem',
@@ -113,9 +128,7 @@ const s = {
     letterSpacing: '0.02em',
     fontFamily: '-apple-system, BlinkMacSystemFont, system-ui, sans-serif',
   },
-  labelActive: {
-    color: '#00f0ff',
-  },
+  labelActive: { color: '#00f0ff' },
   indicator: {
     position: 'absolute',
     top: 0,
