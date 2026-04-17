@@ -20,6 +20,52 @@ export function registerXPortlComponents() {
     },
   });
 
+  // ── directional-gate: hide entity unless viewer aims in the right direction ──
+  // Module-level orientation tracker for the A-Frame tick loop
+  let _gateHeading = null;
+  let _gatePitch = null;
+  const gateHandler = (e) => {
+    _gateHeading = e.webkitCompassHeading ?? (e.alpha !== null ? (360 - e.alpha) % 360 : null);
+    if (e.beta !== null) _gatePitch = 90 - e.beta;
+  };
+  window.addEventListener('deviceorientationabsolute', gateHandler, true);
+  window.addEventListener('deviceorientation', gateHandler, true);
+
+  AFRAME.registerComponent('directional-gate', {
+    schema: {
+      targetHeading: { type: 'number', default: 0 },
+      targetPitch: { type: 'number', default: 0 },
+      headingTolerance: { type: 'number', default: 15 },
+      pitchTolerance: { type: 'number', default: 20 },
+    },
+    init() {
+      this._lastCheck = 0;
+      this.el.object3D.visible = false; // hidden until aimed at
+    },
+    tick(time) {
+      // Throttle to ~10Hz
+      if (time - this._lastCheck < 100) return;
+      this._lastCheck = time;
+
+      if (_gateHeading === null) return;
+
+      const dH = this.data.targetHeading;
+      const dP = this.data.targetPitch;
+
+      // Shortest angular distance (handles 0/360 wraparound)
+      let headingDiff = _gateHeading - dH;
+      headingDiff = ((headingDiff + 180) % 360 + 360) % 360 - 180;
+
+      const pitchDiff = (_gatePitch || 0) - dP;
+
+      const inView =
+        Math.abs(headingDiff) <= this.data.headingTolerance &&
+        Math.abs(pitchDiff) <= this.data.pitchTolerance;
+
+      this.el.object3D.visible = inView;
+    },
+  });
+
   // ── capsule-data: click handler + haptic feedback ──
   AFRAME.registerComponent('capsule-data', {
     schema: {

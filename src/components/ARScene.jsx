@@ -275,6 +275,12 @@ function buildCapsuleEntity(cap, altitudeY = 0) {
   wrapper.setAttribute('look-at', '[gps-camera]');
   wrapper.setAttribute('fixed-altitude', `y: ${altitudeY}`);
 
+  // Directional gate — only show when viewer aims in the right direction
+  if (cap.heading_deg !== null && cap.heading_deg !== undefined) {
+    wrapper.setAttribute('directional-gate',
+      `targetHeading: ${cap.heading_deg}; targetPitch: ${cap.pitch_deg || 0}`);
+  }
+
   // Outer halo — bigger and brighter for higher rarities
   const haloR = (3.6 * scale * vfx.haloMult).toFixed(1);
   const halo = document.createElement('a-sphere');

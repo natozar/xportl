@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { isCapsuleLocked, isGhostCapsule, getRarity, getCapsuleType } from '../services/capsules';
+import { useDeviceOrientation } from '../hooks/useDeviceOrientation';
 
 /**
  * NearbyOverlay — directional edge indicators only.
@@ -11,6 +12,7 @@ import { isCapsuleLocked, isGhostCapsule, getRarity, getCapsuleType } from '../s
  */
 export default function NearbyOverlay({ capsules, userLat, userLng, onSelect }) {
   const [heading, setHeading] = useState(0);
+  const { getPitch } = useDeviceOrientation();
 
   useEffect(() => {
     const handler = (e) => {
@@ -74,6 +76,17 @@ export default function NearbyOverlay({ capsules, userLat, userLng, onSelect }) 
 
         const distLabel = dist < 1 ? 'aqui' : dist < 1000 ? `${dist.toFixed(0)}m` : `${(dist / 1000).toFixed(1)}km`;
 
+        // For directional capsules within 50m, show warmth indicator
+        const hasDirection = cap.heading_deg !== null && cap.heading_deg !== undefined;
+        let warmth = null; // null = no direction, 0-1 = cold to hot
+        if (hasDirection && dist < 50) {
+          let hDiff = heading - cap.heading_deg;
+          hDiff = ((hDiff + 180) % 360 + 360) % 360 - 180;
+          const pDiff = (getPitch() || 0) - (cap.pitch_deg || 0);
+          const totalDiff = Math.sqrt(hDiff * hDiff + pDiff * pDiff);
+          warmth = Math.max(0, 1 - totalDiff / 60); // 1 = perfect aim, 0 = 60°+ off
+        }
+
         // Arrow rotation: point from edge toward center
         let arrowDeg = 0;
         if (absAngle <= 60) arrowDeg = 180; // top → points down
@@ -103,7 +116,27 @@ export default function NearbyOverlay({ capsules, userLat, userLng, onSelect }) 
                 {locked ? '🔒' : cType.icon}
               </span>
               <span style={s.chipDist}>{distLabel}</span>
+              {warmth !== null && (
+                <span style={{
+                  fontSize: '0.5rem', fontWeight: 700,
+                  color: warmth > 0.7 ? '#ff3366' : warmth > 0.3 ? '#f59e0b' : '#3b82f6',
+                }}>
+                  {warmth > 0.7 ? '🔥' : warmth > 0.3 ? '🟡' : '❄️'}
+                </span>
+              )}
             </div>
+            {/* Hint photo thumbnail when close + directional */}
+            {warmth !== null && warmth < 0.7 && cap.hint_photo_url && (
+              <img
+                src={cap.hint_photo_url}
+                alt=""
+                style={{
+                  ...s.hintThumb,
+                  opacity: 0.4 + warmth * 0.4,
+                  filter: `saturate(0) brightness(0.4) sepia(1) hue-rotate(${warmth > 0.3 ? '0' : '180'}deg)`,
+                }}
+              />
+            )}
           </button>
         );
       })}
@@ -155,6 +188,11 @@ const s = {
   chipDist: {
     fontSize: '0.45rem', color: 'rgba(255,255,255,0.35)',
     fontFamily: 'ui-monospace, monospace',
+  },
+  hintThumb: {
+    width: 48, height: 36, borderRadius: 6, objectFit: 'cover',
+    border: '1px solid rgba(255,255,255,0.1)',
+    pointerEvents: 'none', marginTop: 2,
   },
   badge: {
     position: 'absolute', top: 'calc(10px + env(safe-area-inset-top, 0px))', left: '50%',

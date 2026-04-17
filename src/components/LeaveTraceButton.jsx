@@ -5,6 +5,7 @@ import { RARITIES, CAPSULE_TYPES } from '../services/capsules';
 import { calculateLevel } from '../services/gamification';
 import { supabase } from '../services/supabase';
 import CameraModal from './CameraModal';
+import PlacementMode from './PlacementMode';
 
 const GHOST_VIEW_OPTIONS = [5, 10, 50];
 const MAX_MESSAGE = 280;
@@ -29,7 +30,9 @@ export default function LeaveTraceButton({ onPress, saving }) {
   const [message, setMessage] = useState('');
   const [lockUntilTomorrow, setLockUntilTomorrow] = useState(false);
   const [cameraOpen, setCameraOpen] = useState(null);
+  const [placementMode, setPlacementMode] = useState(false);
   const [userLevel, setUserLevel] = useState(1);
+  const pendingDataRef = useRef(null);
   const inputRef = useRef(null);
   const { media, recording, scanning, moderationError, acceptCapturedMedia, startAudioRecording, stopAudioRecording, clearMedia, dismissModerationError } = useMediaCapture();
 
@@ -68,9 +71,6 @@ export default function LeaveTraceButton({ onPress, saving }) {
       return;
     }
 
-    setFeedback({ status: 'saving', rarity: currentRarity, cType: currentCType });
-    setOpen(false);
-
     let unlockDate = null;
     if (lockUntilTomorrow) {
       const tomorrow = new Date();
@@ -79,7 +79,8 @@ export default function LeaveTraceButton({ onPress, saving }) {
       unlockDate = tomorrow.toISOString();
     }
 
-    await onPress({
+    // Store pending data and enter placement mode
+    pendingDataRef.current = {
       unlockDate,
       message: (message || '').trim() || 'Estive aqui!',
       mediaBlob: media?.blob || null,
@@ -88,6 +89,27 @@ export default function LeaveTraceButton({ onPress, saving }) {
       visibilityLayer: currentVis.key,
       rarity: currentRarity.key,
       capsuleType: currentCType.key,
+      _rarity: currentRarity,
+      _cType: currentCType,
+    };
+
+    setOpen(false);
+    setPlacementMode(true);
+  };
+
+  const handlePlacementConfirm = async ({ headingDeg, pitchDeg, hintPhotoBlob }) => {
+    setPlacementMode(false);
+    const data = pendingDataRef.current;
+    if (!data) return;
+    pendingDataRef.current = null;
+
+    setFeedback({ status: 'saving', rarity: data._rarity, cType: data._cType });
+
+    await onPress({
+      ...data,
+      headingDeg,
+      pitchDeg,
+      hintPhotoBlob,
     });
 
     clearMedia();
@@ -98,9 +120,15 @@ export default function LeaveTraceButton({ onPress, saving }) {
     setMessage('');
     setLockUntilTomorrow(false);
     setStep('compose');
-    setFeedback({ status: 'done', rarity: currentRarity, cType: currentCType });
+    setFeedback({ status: 'done', rarity: data._rarity, cType: data._cType });
     if (navigator.vibrate) navigator.vibrate([50, 30, 50]);
     setTimeout(() => setFeedback(null), 3000);
+  };
+
+  const handlePlacementCancel = () => {
+    setPlacementMode(false);
+    pendingDataRef.current = null;
+    setOpen(true); // reopen the sheet
   };
 
   const handleClose = () => {
@@ -385,6 +413,11 @@ export default function LeaveTraceButton({ onPress, saving }) {
             )}
           </div>
         </div>
+      )}
+
+      {/* Placement mode */}
+      {placementMode && (
+        <PlacementMode onConfirm={handlePlacementConfirm} onCancel={handlePlacementCancel} />
       )}
 
       {/* Camera modal */}

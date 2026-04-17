@@ -84,7 +84,7 @@ export function haptic(pattern = [100, 50, 100]) {
 
 // ── CRUD ──
 
-export async function createCapsule({ lat, lng, altitude, content, visibility_layer, unlock_date, media_url, media_type, views_left, created_by, rarity, capsule_type }) {
+export async function createCapsule({ lat, lng, altitude, content, visibility_layer, unlock_date, media_url, media_type, views_left, created_by, rarity, capsule_type, heading_deg, pitch_deg, hint_photo_url }) {
   const capsule = {
     lat,
     lng,
@@ -98,6 +98,9 @@ export async function createCapsule({ lat, lng, altitude, content, visibility_la
     created_by: created_by || null,
     rarity: rarity || 'common',
     capsule_type: capsule_type || 'standard',
+    heading_deg: heading_deg ?? null,
+    pitch_deg: pitch_deg ?? null,
+    hint_photo_url: hint_photo_url || null,
   };
 
   if (!isSupabaseConfigured()) {
@@ -108,7 +111,7 @@ export async function createCapsule({ lat, lng, altitude, content, visibility_la
   const { data, error } = await supabase
     .from('capsules')
     .insert(capsule)
-    .select('id, lat, lng, content, visibility_layer, rarity, capsule_type, created_at')
+    .select('id, lat, lng, content, visibility_layer, rarity, capsule_type, heading_deg, pitch_deg, hint_photo_url, created_at')
     .single();
 
   if (error) {
@@ -224,7 +227,7 @@ export async function getNearbyCapsules(lat, lng, radiusMeters = 50) {
   const degreeRadius = radiusMeters / 111000;
   const { data: rawData, error: selectError } = await supabase
     .from('capsules')
-    .select('id, lat, lng, altitude, content, visibility_layer, unlock_date, views_count, views_left, media_url, media_type, created_at, created_by, moderation_status, rarity, capsule_type')
+    .select('id, lat, lng, altitude, content, visibility_layer, unlock_date, views_count, views_left, media_url, media_type, created_at, created_by, moderation_status, rarity, capsule_type, heading_deg, pitch_deg, hint_photo_url')
     .gte('lat', lat - degreeRadius)
     .lte('lat', lat + degreeRadius)
     .gte('lng', lng - degreeRadius)

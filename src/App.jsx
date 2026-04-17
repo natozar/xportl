@@ -380,7 +380,7 @@ export default function App() {
   }, [ready, geo.lat, geo.lng]);
 
   // ── Leave Trace (with all compliance checks) ──
-  const handleLeaveTrace = useCallback(async ({ unlockDate, message, mediaBlob, mediaType, viewsLeft, visibilityLayer, rarity, capsuleType }) => {
+  const handleLeaveTrace = useCallback(async ({ unlockDate, message, mediaBlob, mediaType, viewsLeft, visibilityLayer, rarity, capsuleType, headingDeg, pitchDeg, hintPhotoBlob }) => {
     if (savingLockRef.current || geo.lat === null || !session?.user?.id) {
       if (geo.lat === null) alert('Aguardando sinal GPS... Tente novamente em instantes.');
       return;
@@ -435,9 +435,16 @@ export default function App() {
         mediaTypeField = mediaType;
       }
 
+      // Upload hint photo (placement snapshot) if provided
+      let hintPhotoUrl = null;
+      if (hintPhotoBlob) {
+        try {
+          const hintResult = await uploadMedia(hintPhotoBlob, 'image');
+          hintPhotoUrl = hintResult.url;
+        } catch (e) { console.warn('[XPortl] Hint photo upload failed:', e); }
+      }
+
       // Place capsule at user's exact GPS coordinates.
-      // The NearbyOverlay compass system handles visualization.
-      // Slight offset (1m in look direction) prevents exact-zero-distance rendering.
       const plant = smartPlaceCoord(geo.lat, geo.lng, geo.accuracy, getHeading());
       await createCapsule({
         lat: plant.lat,
@@ -452,6 +459,9 @@ export default function App() {
         created_by: session.user.id,
         rarity: rarity || 'common',
         capsule_type: capsuleType || 'standard',
+        heading_deg: headingDeg ?? null,
+        pitch_deg: pitchDeg ?? null,
+        hint_photo_url: hintPhotoUrl,
       });
 
       // Log access (Marco Civil Art. 15) — fire-and-forget
