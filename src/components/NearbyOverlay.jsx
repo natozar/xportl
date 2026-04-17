@@ -1,13 +1,17 @@
 import { useState, useEffect, useRef } from 'react';
 import { isCapsuleLocked, isGhostCapsule, getRarity, getCapsuleType } from '../services/capsules';
 
+/**
+ * NearbyOverlay — directional edge indicators only.
+ *
+ * Shows small arrow pointers around the screen edge pointing
+ * toward each capsule's real-world bearing. Tapping an arrow
+ * opens the capsule modal. Capsules are NEVER rendered as
+ * floating orbs — that's ARScene's job via GPS coordinates.
+ */
 export default function NearbyOverlay({ capsules, userLat, userLng, onSelect }) {
   const [heading, setHeading] = useState(0);
-  const tickRef = useRef(0);
-  const rafRef = useRef(null);
-  const [, forceUpdate] = useState(0);
 
-  // Compass
   useEffect(() => {
     const handler = (e) => {
       const h = e.webkitCompassHeading ?? (e.alpha !== null ? (360 - e.alpha) % 360 : null);
@@ -21,21 +25,6 @@ export default function NearbyOverlay({ capsules, userLat, userLng, onSelect }) 
     };
   }, []);
 
-  // Animation loop via rAF — only re-renders at ~10fps to keep it subtle
-  useEffect(() => {
-    let lastFrame = 0;
-    const loop = (now) => {
-      rafRef.current = requestAnimationFrame(loop);
-      // Throttle to ~10fps (100ms between frames)
-      if (now - lastFrame < 100) return;
-      lastFrame = now;
-      tickRef.current = now;
-      forceUpdate((n) => n + 1);
-    };
-    rafRef.current = requestAnimationFrame(loop);
-    return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); };
-  }, []);
-
   const nearby = (capsules || []).filter((c) =>
     c.content?.type !== 'ping' && (c.distance_meters === undefined || c.distance_meters <= 500)
   );
@@ -44,111 +33,76 @@ export default function NearbyOverlay({ capsules, userLat, userLng, onSelect }) 
 
   return (
     <div style={s.container}>
-      {nearby.map((cap, idx) => {
-        const bearing = (userLat && userLng) ? getBearing(userLat, userLng, cap.lat, cap.lng) : idx * 60;
+      {nearby.map((cap) => {
+        const bearing = (userLat && userLng)
+          ? getBearing(userLat, userLng, cap.lat, cap.lng)
+          : 0;
+
         let relAngle = bearing - heading;
         while (relAngle > 180) relAngle -= 360;
         while (relAngle < -180) relAngle += 360;
 
-        // Show markers in wider FOV (±120° so they're visible when turning)
-        if (Math.abs(relAngle) > 120) return null;
-
-        const screenX = 50 + (relAngle / 120) * 48;
         const dist = cap.distance_meters || 0;
         const locked = isCapsuleLocked(cap);
-        const ghost = isGhostCapsule(cap);
         const rarity = getRarity(cap);
         const cType = getCapsuleType(cap);
-
-        // Distribute vertically
-        const distBand = Math.min(dist / 500, 1);
-        const verticalBase = 30 + distBand * 25;
-        const stagger = (idx % 5) * 8;
-        const screenY = verticalBase + stagger;
-
-        // Visual properties — rarity affects size and color
-        const closeness = Math.max(0, 1 - dist / 500);
-        const rarityBoost = rarity.scale - 1;
-        const size = (40 + closeness * 16) * (1 + rarityBoost * 0.3);
-        const hexToRgb = (hex) => [parseInt(hex.slice(1,3),16), parseInt(hex.slice(3,5),16), parseInt(hex.slice(5,7),16)];
         const useRarityColor = rarity.key !== 'common';
-        const baseColor = useRarityColor ? hexToRgb(rarity.color) : locked ? [180, 74, 255] : ghost ? [180, 74, 255] : [0, 240, 255];
-        const color = `rgb(${baseColor.join(',')})`;
-        const glow = `rgba(${baseColor.join(',')}, ${0.2 + closeness * 0.2})`;
+        const color = useRarityColor ? rarity.color : locked ? '#b44aff' : '#00f0ff';
 
-        // Subtle animation (slow, steady — easy to tap)
-        const t = tickRef.current;
-        const phase = (t / 3000 + idx * 1.7) % (Math.PI * 2);
-        const floatY = Math.sin(phase) * 1.5; // minimal float
-        const ringRotation = (t / 200 + idx * 40) % 360; // slow spin
-        const pulseScale = 1 + Math.sin(phase * 2) * 0.03; // barely breathing
+        // Place indicator on screen edge based on relative angle.
+        // ±60° = within camera FOV → top edge
+        // ±60-120° = sides
+        // >120° = bottom edge (behind you)
+        const absAngle = Math.abs(relAngle);
+        let posStyle;
+
+        if (absAngle <= 60) {
+          // Top edge — horizontal position maps angle to screen width
+          const x = 50 + (relAngle / 60) * 45;
+          posStyle = { top: 0, left: `${x}%`, transform: 'translateX(-50%)' };
+        } else if (absAngle <= 120) {
+          // Side edges
+          const side = relAngle > 0 ? 'right' : 'left';
+          const verticalT = (absAngle - 60) / 60; // 0 at 60°, 1 at 120°
+          const y = 10 + verticalT * 50; // 10%-60% from top
+          posStyle = { top: `${y}%`, [side]: 0, transform: 'translateY(-50%)' };
+        } else {
+          // Bottom edge — behind user
+          const x = 50 - ((relAngle > 0 ? 180 - relAngle : -180 - relAngle) / 60) * 45;
+          posStyle = { bottom: 0, left: `${Math.max(5, Math.min(95, x))}%`, transform: 'translateX(-50%)' };
+        }
+
+        const distLabel = dist < 1 ? 'aqui' : dist < 1000 ? `${dist.toFixed(0)}m` : `${(dist / 1000).toFixed(1)}km`;
+
+        // Arrow rotation: point from edge toward center
+        let arrowDeg = 0;
+        if (absAngle <= 60) arrowDeg = 180; // top → points down
+        else if (relAngle > 0 && absAngle <= 120) arrowDeg = 270; // right → points left
+        else if (relAngle < 0 && absAngle <= 120) arrowDeg = 90; // left → points right
+        else arrowDeg = 0; // bottom → points up
 
         return (
           <button
             key={cap.id}
-            style={{
-              ...s.portal,
-              left: `${screenX}%`,
-              top: `${screenY}%`,
-              transform: `translate(-50%, -50%) translateY(${floatY}px)`,
-              width: size, height: size + 30,
-            }}
+            style={{ ...s.indicator, ...posStyle }}
             onClick={() => onSelect(cap)}
           >
-            {/* Outer glow */}
-            <div style={{
-              ...s.outerGlow,
-              width: size * 1.8, height: size * 1.8,
-              background: `radial-gradient(circle, ${glow}, transparent 70%)`,
-              transform: `scale(${pulseScale})`,
-            }} />
-
-            {/* Orbital ring */}
-            <svg style={{ ...s.ring, width: size, height: size, transform: `rotate(${ringRotation}deg)` }} viewBox="0 0 100 100">
-              <ellipse cx="50" cy="50" rx="46" ry="20"
-                fill="none" stroke={color} strokeWidth="1.5"
-                opacity={0.4 + closeness * 0.3}
-                strokeDasharray="8 4"
-              />
+            {/* Arrow */}
+            <svg
+              width="12" height="12" viewBox="0 0 24 24" fill={color}
+              style={{ transform: `rotate(${arrowDeg}deg)`, opacity: 0.7 }}
+            >
+              <path d="M12 4l-6 8h4v8h4v-8h4z" />
             </svg>
-
-            {/* Second ring (cross axis) */}
-            <svg style={{ ...s.ring, width: size, height: size, transform: `rotate(${-ringRotation * 0.7 + 90}deg)` }} viewBox="0 0 100 100">
-              <ellipse cx="50" cy="50" rx="44" ry="18"
-                fill="none" stroke={color} strokeWidth="1"
-                opacity={0.2 + closeness * 0.2}
-              />
-            </svg>
-
-            {/* Core orb */}
-            <div style={{
-              ...s.core,
-              width: size * 0.35, height: size * 0.35,
-              background: `radial-gradient(circle at 35% 35%, #fff, ${color} 60%, transparent)`,
-              boxShadow: `0 0 ${10 + closeness * 20}px ${color}, 0 0 ${20 + closeness * 40}px ${glow}`,
-              transform: `scale(${pulseScale})`,
-            }} />
-
-            {/* Inner shimmer */}
-            <div style={{
-              ...s.shimmer,
-              width: size * 0.2, height: size * 0.2,
-              opacity: 0.6 + Math.sin(phase * 5) * 0.4,
-            }} />
-
-            {/* Info label */}
-            <div style={s.label}>
-              <span style={{ ...s.labelType, color }}>
-                {locked ? '🔒' : cType.icon} {locked ? 'Trancado' : cap.content?.body?.slice(0, 12) || 'Portal'}
-              </span>
+            {/* Info chip */}
+            <div style={{ ...s.chip, borderColor: `${color}33` }}>
               {rarity.key !== 'common' && (
-                <span style={{ fontSize: '0.45rem', color: rarity.color, fontWeight: 700, letterSpacing: '0.06em' }}>
-                  {rarity.icon} {rarity.label}
-                </span>
+                <span style={{ color: rarity.color, fontSize: '0.55rem', fontWeight: 700 }}>{rarity.icon}</span>
               )}
-              <span style={s.labelDist}>
-                {dist < 1 ? 'aqui' : dist < 1000 ? `${dist.toFixed(0)}m` : `${(dist / 1000).toFixed(1)}km`}
+              <span style={{ color, fontSize: '0.5rem', fontWeight: 600 }}>
+                {locked ? '🔒' : cType.icon}
               </span>
+              <span style={s.chipDist}>{distLabel}</span>
             </div>
           </button>
         );
@@ -176,69 +130,35 @@ function getBearing(lat1, lng1, lat2, lng2) {
 
 const s = {
   container: {
-    position: 'fixed',
-    top: 'calc(10px + env(safe-area-inset-top, 0px))',
-    left: 0, right: 0,
-    height: '75%',
+    position: 'fixed', inset: 0,
     zIndex: 10000,
     pointerEvents: 'none',
-    overflow: 'visible',
+    overflow: 'hidden',
   },
-  portal: {
+  indicator: {
     position: 'absolute',
-    display: 'flex', flexDirection: 'column', alignItems: 'center',
-    justifyContent: 'center',
-    background: 'none', border: 'none',
+    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
+    background: 'none', border: 'none', padding: 4,
     pointerEvents: 'auto',
     WebkitTapHighlightColor: 'transparent',
     touchAction: 'manipulation',
-    transition: 'left 0.3s ease-out',
+    zIndex: 1,
   },
-  outerGlow: {
-    position: 'absolute',
-    borderRadius: '50%',
-    transition: 'transform 0.3s ease',
-    pointerEvents: 'none',
-  },
-  ring: {
-    position: 'absolute',
-    pointerEvents: 'none',
-    transition: 'none',
-  },
-  core: {
-    position: 'relative',
-    borderRadius: '50%',
-    zIndex: 2,
-    transition: 'transform 0.3s ease',
-  },
-  shimmer: {
-    position: 'absolute',
-    borderRadius: '50%',
-    background: '#fff',
-    filter: 'blur(2px)',
-    zIndex: 3,
-    pointerEvents: 'none',
-  },
-  label: {
-    position: 'absolute',
-    bottom: -4,
-    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1,
-    padding: '5px 12px', borderRadius: 12,
+  chip: {
+    display: 'flex', alignItems: 'center', gap: 3,
+    padding: '3px 8px', borderRadius: 8,
     background: 'rgba(5,3,15,0.8)',
-    backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)',
+    backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)',
     border: '1px solid rgba(255,255,255,0.06)',
-    zIndex: 4, pointerEvents: 'none',
     whiteSpace: 'nowrap',
   },
-  labelType: {
-    fontSize: '0.6rem', fontWeight: 600, letterSpacing: '0.03em',
-  },
-  labelDist: {
-    fontSize: '0.5rem', color: 'rgba(255,255,255,0.35)',
+  chipDist: {
+    fontSize: '0.45rem', color: 'rgba(255,255,255,0.35)',
     fontFamily: 'ui-monospace, monospace',
   },
   badge: {
-    position: 'absolute', top: 4, left: '50%', transform: 'translateX(-50%)',
+    position: 'absolute', top: 'calc(10px + env(safe-area-inset-top, 0px))', left: '50%',
+    transform: 'translateX(-50%)',
     display: 'flex', alignItems: 'center', gap: 6,
     padding: '6px 16px', borderRadius: 50,
     background: 'rgba(5,3,15,0.75)',
@@ -250,10 +170,6 @@ const s = {
     width: 6, height: 6, borderRadius: '50%',
     background: '#00f0ff', boxShadow: '0 0 8px rgba(0,240,255,0.6)',
   },
-  badgeNum: {
-    fontSize: '0.85rem', fontWeight: 700, color: '#00f0ff',
-  },
-  badgeText: {
-    fontSize: '0.55rem', color: 'rgba(255,255,255,0.35)', letterSpacing: '0.04em',
-  },
+  badgeNum: { fontSize: '0.85rem', fontWeight: 700, color: '#00f0ff' },
+  badgeText: { fontSize: '0.55rem', color: 'rgba(255,255,255,0.35)', letterSpacing: '0.04em' },
 };
