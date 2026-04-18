@@ -73,6 +73,12 @@ export default function CapsuleList() {
                   {cap.media_type && (
                     <span style={{ ...st.badge, background: '#ffffff08', color: '#8888a0' }}>{cap.media_type}</span>
                   )}
+                  {cap.rarity && cap.rarity !== 'common' && (
+                    <span style={{ ...st.badge, background: cap.rarity === 'rare' ? '#3b82f622' : cap.rarity === 'legendary' ? '#f59e0b22' : '#ec489922', color: cap.rarity === 'rare' ? '#3b82f6' : cap.rarity === 'legendary' ? '#f59e0b' : '#ec4899' }}>{cap.rarity}</span>
+                  )}
+                  {cap.capsule_type && cap.capsule_type !== 'standard' && (
+                    <span style={{ ...st.badge, background: '#ffffff08', color: '#8888a0' }}>{cap.capsule_type}</span>
+                  )}
                 </div>
 
                 {/* Text */}
@@ -83,6 +89,7 @@ export default function CapsuleList() {
                   <span>{new Date(cap.created_at).toLocaleString('pt-BR')}</span>
                   <span>Views: {cap.views_count || 0}</span>
                   {cap.views_left !== null && <span>Left: {cap.views_left}</span>}
+                  {cap.heading_deg !== null && <span>📐 {cap.heading_deg?.toFixed(0)}°</span>}
                 </div>
 
                 {/* GPS */}

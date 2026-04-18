@@ -1,14 +1,46 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { updateDisplayName } from '../services/auth';
 import { supabase } from '../services/supabase';
 import { xpProgress, getLevelTitle, BADGES } from '../services/gamification';
+import { RARITIES } from '../services/capsules';
 
 export default function ProfilePage({ session, profile, onOpenSettings, onRefreshProfile, onOpenLeaderboard }) {
   const [editingName, setEditingName] = useState(false);
   const [name, setName] = useState(profile?.display_name || '');
   const [saving, setSaving] = useState(false);
   const [avatarUploading, setAvatarUploading] = useState(false);
+  const [capsuleStats, setCapsuleStats] = useState(null);
   const fileRef = useRef(null);
+
+  // Load capsule stats
+  useEffect(() => {
+    if (!session?.user?.id) return;
+    const uid = session.user.id;
+
+    (async () => {
+      // Created capsules by rarity
+      const { data: created } = await supabase
+        .from('capsules')
+        .select('rarity')
+        .eq('created_by', uid);
+
+      // Discovered (viewed) — count from xp_events
+      const { count: discovered } = await supabase
+        .from('xp_events')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', uid)
+        .eq('action', 'discover_capsule');
+
+      const byRarity = { common: 0, rare: 0, legendary: 0, mythic: 0 };
+      (created || []).forEach((c) => { byRarity[c.rarity || 'common'] = (byRarity[c.rarity || 'common'] || 0) + 1; });
+
+      setCapsuleStats({
+        total: (created || []).length,
+        byRarity,
+        discovered: discovered || 0,
+      });
+    })();
+  }, [session?.user?.id]);
 
   const user = session?.user;
   const avatarUrl = user?.user_metadata?.avatar_url || user?.user_metadata?.picture || null;
@@ -157,6 +189,36 @@ export default function ProfilePage({ session, profile, onOpenSettings, onRefres
             </>
           );
         })()}
+
+        {/* Capsule stats */}
+        {capsuleStats && (
+          <div style={s.capsuleStatsSection}>
+            <div style={s.badgeLabel}>MEUS PORTAIS</div>
+            <div style={s.capsuleStatsRow}>
+              <div style={s.capsuleStatMain}>
+                <span style={s.capsuleStatNum}>{capsuleStats.total}</span>
+                <span style={s.capsuleStatLabel}>criados</span>
+              </div>
+              <div style={s.capsuleStatMain}>
+                <span style={s.capsuleStatNum}>{capsuleStats.discovered}</span>
+                <span style={s.capsuleStatLabel}>descobertos</span>
+              </div>
+            </div>
+            <div style={s.rarityBreakdown}>
+              {Object.entries(capsuleStats.byRarity).map(([key, count]) => {
+                const r = RARITIES[key];
+                if (!r || count === 0) return null;
+                return (
+                  <div key={key} style={s.rarityStatItem}>
+                    <span style={{ color: r.color, fontSize: '0.7rem' }}>{r.icon}</span>
+                    <span style={{ ...s.rarityStatCount, color: r.color }}>{count}</span>
+                    <span style={s.rarityStatName}>{r.label}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Stats */}
         <div style={s.statsGrid}>
@@ -314,6 +376,33 @@ const s = {
     background: 'rgba(0,240,255,0.03)', border: '1px solid rgba(0,240,255,0.08)',
     color: '#00f0ff', fontSize: '0.78rem', fontWeight: 600, fontFamily: 'inherit',
   },
+
+  // ── Capsule Stats ──
+  capsuleStatsSection: {
+    width: '100%', maxWidth: 360, marginBottom: 16,
+    padding: '14px 18px', borderRadius: 16,
+    background: 'rgba(0,240,255,0.03)', border: '1px solid rgba(0,240,255,0.08)',
+  },
+  capsuleStatsRow: {
+    display: 'flex', gap: 16, marginBottom: 12,
+  },
+  capsuleStatMain: {
+    flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
+    padding: '10px 0', borderRadius: 10,
+    background: 'rgba(255,255,255,0.02)',
+  },
+  capsuleStatNum: { fontSize: '1.4rem', fontWeight: 700, color: '#00f0ff' },
+  capsuleStatLabel: { fontSize: '0.5rem', color: 'rgba(255,255,255,0.3)', fontWeight: 600, letterSpacing: '0.08em' },
+  rarityBreakdown: {
+    display: 'flex', gap: 8, justifyContent: 'center',
+  },
+  rarityStatItem: {
+    display: 'flex', alignItems: 'center', gap: 4,
+    padding: '4px 10px', borderRadius: 8,
+    background: 'rgba(255,255,255,0.02)',
+  },
+  rarityStatCount: { fontSize: '0.75rem', fontWeight: 700 },
+  rarityStatName: { fontSize: '0.5rem', color: 'rgba(255,255,255,0.25)', fontWeight: 600 },
 
   // ── Stats ──
   statsGrid: {

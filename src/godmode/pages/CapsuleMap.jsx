@@ -31,7 +31,7 @@ export default function CapsuleMap() {
     (async () => {
       const { data, error } = await supabase
         .from('capsules')
-        .select('id, lat, lng, content, visibility_layer, unlock_date, views_count, views_left, media_url, media_type, moderation_status, flag_count, created_by, created_at')
+        .select('id, lat, lng, content, visibility_layer, unlock_date, views_count, views_left, media_url, media_type, moderation_status, flag_count, created_by, created_at, rarity, capsule_type, heading_deg')
         .order('created_at', { ascending: false })
         .limit(1000);
 
@@ -56,6 +56,10 @@ export default function CapsuleMap() {
         withMedia: caps.filter(c => c.media_url).length,
         flagged: caps.filter(c => c.flag_count > 0).length,
         removed: caps.filter(c => c.moderation_status === 'removed').length,
+        rare: caps.filter(c => c.rarity === 'rare').length,
+        legendary: caps.filter(c => c.rarity === 'legendary').length,
+        mythic: caps.filter(c => c.rarity === 'mythic').length,
+        directional: caps.filter(c => c.heading_deg !== null).length,
       });
       setLoading(false);
     })();
