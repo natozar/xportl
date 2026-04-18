@@ -12,6 +12,7 @@ import VortexModal from './components/VortexModal';
 import VibePing from './components/VibePing';
 import ReportModal from './components/ReportModal';
 import InstallPrompt from './components/InstallPrompt';
+import Onboarding from './components/Onboarding';
 import BottomNav from './components/BottomNav';
 import NearbyOverlay from './components/NearbyOverlay';
 import MapView from './components/MapView';
@@ -112,6 +113,7 @@ export default function App() {
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [unreadNotifs, setUnreadNotifs] = useState(0);
   const [showPortalAnimation, setShowPortalAnimation] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(false);
   const [scanVersion, setScanVersion] = useState(0);
 
   // ── Auth listener ──
@@ -750,7 +752,14 @@ export default function App() {
 
       {/* Portal opening animation (first time only) */}
       {showPortalAnimation && (
-        <PortalAnimation onComplete={() => setShowPortalAnimation(false)} />
+        <PortalAnimation onComplete={() => {
+          setShowPortalAnimation(false);
+          if (!localStorage.getItem('xportl_onboarding')) setShowOnboarding(true);
+        }} />
+      )}
+
+      {showOnboarding && (
+        <Onboarding onComplete={() => setShowOnboarding(false)} />
       )}
 
       {/* CreatePost disabled — using LeaveTraceButton FAB instead */}
