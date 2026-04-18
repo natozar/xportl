@@ -729,6 +729,8 @@ export default function App() {
         onClose={() => setSelectedCapsule(null)}
         onSelfDestruct={handleSelfDestruct}
         onReport={handleReport}
+        userLat={geo.lat}
+        userLng={geo.lng}
       />
 
       <VortexModal
