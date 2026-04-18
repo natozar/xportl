@@ -138,11 +138,10 @@ export default function ARScene({ capsules, pings, onCapsuleClick, onVortexClick
     if (!scene) return;
 
     const syncEntities = () => {
-      // ONLY render capsules within 30m in AR.
+      // ONLY render capsules within 3m in AR.
+      // You must be physically at the capsule's location to see it.
       // Farther capsules are shown as edge indicators by NearbyOverlay.
-      // This prevents capsules 200-500m away from appearing as floating
-      // orbs in your face — especially with inaccurate indoor GPS.
-      const AR_RENDER_RADIUS = 30; // meters
+      const AR_RENDER_RADIUS = 3; // meters
       const realCapsules = capsules.filter((c) =>
         !isPing(c) && c.distance_meters !== undefined && c.distance_meters <= AR_RENDER_RADIUS
       );
