@@ -222,32 +222,34 @@ export async function getNearbyCapsules(lat, lng, radiusMeters = 50) {
 
   console.warn('[XPortl] RPC get_nearby_capsules failed:', rpcError?.message, '— using fallback SELECT');
 
-  console.warn('[XPortl] RPC fallback:', rpcError?.message);
-
-  const degreeRadius = radiusMeters / 111000;
+  // Fallback: bounding-box pre-filter + client-side haversine.
+  // Wider box to account for longitude distortion, then exact filter.
+  const degreeRadius = (radiusMeters / 111000) * 1.2; // 20% margin
   const { data: rawData, error: selectError } = await supabase
     .from('capsules')
     .select('id, lat, lng, altitude, content, visibility_layer, unlock_date, views_count, views_left, media_url, media_type, created_at, created_by, moderation_status, rarity, capsule_type, heading_deg, pitch_deg, hint_photo_url')
     .gte('lat', lat - degreeRadius)
     .lte('lat', lat + degreeRadius)
     .gte('lng', lng - degreeRadius)
-    .lte('lng', lng + degreeRadius);
+    .lte('lng', lng + degreeRadius)
+    .eq('moderation_status', 'active')
+    .limit(200); // Cap to prevent memory spikes in dense areas
 
   if (selectError) return [];
 
-  return (rawData || [])
-    .filter((c) => {
-      if (c.views_left !== null && c.views_left <= 0) return false;
-      if (c.moderation_status && c.moderation_status !== 'active') return false;
-      return true;
-    })
-    .map((c) => ({
+  // Single pass: filter + compute distance + sort
+  const results = [];
+  for (const c of rawData || []) {
+    if (c.views_left !== null && c.views_left <= 0) continue;
+    const dist = haversineDistance(lat, lng, c.lat, c.lng);
+    if (dist > radiusMeters) continue;
+    results.push({
       ...c,
       media_type: c.media_type || inferMediaType(c.media_url),
-      distance_meters: haversineDistance(lat, lng, c.lat, c.lng),
-    }))
-    .filter((c) => c.distance_meters <= radiusMeters)
-    .sort((a, b) => a.distance_meters - b.distance_meters);
+      distance_meters: dist,
+    });
+  }
+  return results.sort((a, b) => a.distance_meters - b.distance_meters);
 }
 
 export { haversineDistance };

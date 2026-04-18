@@ -12,16 +12,18 @@ export function registerXPortlComponents() {
 
   if (AFRAME.components['capsule-data']) return;
 
-  // ── fixed-altitude: locks entity Y to a fixed height regardless of GPS altitude ──
+  // ── fixed-altitude: set Y once, not every frame ──
   AFRAME.registerComponent('fixed-altitude', {
     schema: { y: { type: 'number', default: 0 } },
-    tick() {
+    init() {
+      this.el.object3D.position.y = this.data.y;
+    },
+    update() {
       this.el.object3D.position.y = this.data.y;
     },
   });
 
-  // ── directional-gate: hide entity unless viewer aims in the right direction ──
-  // Module-level orientation tracker for the A-Frame tick loop
+  // ── Module-level orientation for directional-gate ──
   let _gateHeading = null;
   let _gatePitch = null;
   const gateHandler = (e) => {
@@ -31,6 +33,7 @@ export function registerXPortlComponents() {
   window.addEventListener('deviceorientationabsolute', gateHandler, true);
   window.addEventListener('deviceorientation', gateHandler, true);
 
+  // ── directional-gate: hide entity unless viewer aims in the right direction ──
   AFRAME.registerComponent('directional-gate', {
     schema: {
       targetHeading: { type: 'number', default: 0 },
@@ -40,29 +43,27 @@ export function registerXPortlComponents() {
     },
     init() {
       this._lastCheck = 0;
-      this.el.object3D.visible = false; // hidden until aimed at
+      this._wasVisible = false;
+      this.el.object3D.visible = false;
     },
     tick(time) {
-      // Throttle to ~10Hz
-      if (time - this._lastCheck < 100) return;
+      if (time - this._lastCheck < 150) return; // ~7Hz is enough
       this._lastCheck = time;
-
       if (_gateHeading === null) return;
 
-      const dH = this.data.targetHeading;
-      const dP = this.data.targetPitch;
-
-      // Shortest angular distance (handles 0/360 wraparound)
-      let headingDiff = _gateHeading - dH;
-      headingDiff = ((headingDiff + 180) % 360 + 360) % 360 - 180;
-
-      const pitchDiff = (_gatePitch || 0) - dP;
+      let hDiff = _gateHeading - this.data.targetHeading;
+      hDiff = ((hDiff + 180) % 360 + 360) % 360 - 180;
+      const pDiff = (_gatePitch || 0) - this.data.targetPitch;
 
       const inView =
-        Math.abs(headingDiff) <= this.data.headingTolerance &&
-        Math.abs(pitchDiff) <= this.data.pitchTolerance;
+        Math.abs(hDiff) <= this.data.headingTolerance &&
+        Math.abs(pDiff) <= this.data.pitchTolerance;
 
-      this.el.object3D.visible = inView;
+      // Only toggle when state changes (avoid GPU churn)
+      if (inView !== this._wasVisible) {
+        this.el.object3D.visible = inView;
+        this._wasVisible = inView;
+      }
     },
   });
 
@@ -103,7 +104,7 @@ export function registerXPortlComponents() {
     },
   });
 
-  // ── glitch-glow: emissive pulsing with glitch flicker ──
+  // ── glitch-glow: emissive pulsing (throttled, no setTimeout leak) ──
   AFRAME.registerComponent('glitch-glow', {
     schema: {
       color: { type: 'color', default: '#00ff88' },
@@ -113,62 +114,79 @@ export function registerXPortlComponents() {
       locked: { type: 'boolean', default: false },
     },
     init() {
-      this.startTime = Date.now();
+      this._startTime = performance.now();
+      this._lastTick = 0;
+      this._flickerEnd = 0;
     },
-    tick() {
+    tick(time) {
+      // Throttle to ~15fps
+      if (time - this._lastTick < 66) return;
+      this._lastTick = time;
+
       const mesh = this.el.getObject3D('mesh');
       if (!mesh || !mesh.material) return;
 
-      const elapsed = Date.now() - this.startTime;
+      const elapsed = time - this._startTime;
       const t = (Math.sin((elapsed / this.data.speed) * Math.PI * 2) + 1) / 2;
-      const intensity =
+      mesh.material.emissiveIntensity =
         this.data.minIntensity + t * (this.data.maxIntensity - this.data.minIntensity);
 
-      mesh.material.emissiveIntensity = intensity;
-
-      const flickerChance = this.data.locked ? 0.008 : 0.003;
-      if (Math.random() < flickerChance) {
-        mesh.material.opacity = this.data.locked ? 0.15 : 0.3;
-        setTimeout(() => {
-          if (mesh.material) mesh.material.opacity = 0.85;
-        }, this.data.locked ? 120 : 60);
+      // Flicker: use time comparison instead of setTimeout
+      if (this._flickerEnd > 0) {
+        if (time > this._flickerEnd) {
+          mesh.material.opacity = 0.85;
+          this._flickerEnd = 0;
+        }
+      } else {
+        const chance = this.data.locked ? 0.008 : 0.003;
+        if (Math.random() < chance) {
+          mesh.material.opacity = this.data.locked ? 0.15 : 0.3;
+          this._flickerEnd = time + (this.data.locked ? 120 : 60);
+        }
       }
     },
   });
 
-  // ── ping-rise: makes an entity rise and fade over its lifetime ──
+  // ── ping-rise: makes an entity rise and fade (throttled) ──
   AFRAME.registerComponent('ping-rise', {
     schema: {
       duration: { type: 'number', default: 15000 },
       maxHeight: { type: 'number', default: 12 },
     },
     init() {
-      this.startTime = Date.now();
-      this.startY = this.el.object3D.position.y;
+      this._startTime = performance.now();
+      this._startY = this.el.object3D.position.y;
+      this._lastTick = 0;
+      this._removed = false;
     },
-    tick() {
-      const elapsed = Date.now() - this.startTime;
+    tick(time) {
+      if (this._removed) return;
+      // Throttle to ~10fps
+      if (time - this._lastTick < 100) return;
+      this._lastTick = time;
+
+      const elapsed = time - this._startTime;
       const t = Math.min(1, elapsed / this.data.duration);
-
-      // Rise with easing
       const ease = 1 - Math.pow(1 - t, 2);
-      this.el.object3D.position.y = this.startY + ease * this.data.maxHeight;
+      this.el.object3D.position.y = this._startY + ease * this.data.maxHeight;
 
-      // Fade out in last 40%
-      const fadeStart = 0.6;
-      if (t > fadeStart) {
-        const fadeT = (t - fadeStart) / (1 - fadeStart);
-        const meshes = this.el.object3D.children;
-        meshes.forEach((child) => {
-          if (child.material) {
-            child.material.opacity = 1 - fadeT;
+      // Fade in last 40%
+      if (t > 0.6) {
+        const fadeT = (t - 0.6) / 0.4;
+        const opacity = 1 - fadeT;
+        this.el.object3D.traverse((child) => {
+          if (child.material && child.material.opacity !== undefined) {
+            child.material.opacity = opacity;
           }
         });
       }
 
-      // Self-remove when done
-      if (t >= 1 && this.el.parentNode) {
-        this.el.parentNode.removeChild(this.el);
+      // Remove after duration (deferred to avoid tick-removal issues)
+      if (t >= 1 && !this._removed) {
+        this._removed = true;
+        setTimeout(() => {
+          if (this.el.parentNode) this.el.parentNode.removeChild(this.el);
+        }, 0);
       }
     },
   });

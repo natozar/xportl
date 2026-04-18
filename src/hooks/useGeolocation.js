@@ -1,5 +1,15 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 
+// Reject positions with accuracy worse than this (meters).
+// In dense urban / indoor, accuracy can be 100-500m — unusable for AR.
+const MAX_ACCURACY = 100;
+
+// Smooth GPS jitter with exponential moving average
+function smoothCoord(prev, next, alpha = 0.3) {
+  if (prev === null) return next;
+  return prev + alpha * (next - prev);
+}
+
 export function useGeolocation() {
   const [state, setState] = useState({
     granted: false,
@@ -14,9 +24,8 @@ export function useGeolocation() {
   });
 
   const resolveRef = useRef(null);
+  const lastGoodRef = useRef({ lat: null, lng: null });
 
-  // request() returns a Promise that resolves when the FIRST position arrives
-  // or rejects on permission denial. This allows PermissionGate to await it.
   const request = useCallback(() => {
     if (!('geolocation' in navigator)) {
       setState(s => ({ ...s, denied: true, error: 'Geolocation not supported' }));
@@ -30,18 +39,36 @@ export function useGeolocation() {
 
       const watchId = navigator.geolocation.watchPosition(
         (pos) => {
+          const { latitude, longitude, altitude, accuracy } = pos.coords;
+
+          // Reject wildly inaccurate positions (urban canyon / indoor)
+          if (accuracy > MAX_ACCURACY) {
+            console.warn(`[XPortl GPS] Rejected position: accuracy ${accuracy.toFixed(0)}m > ${MAX_ACCURACY}m`);
+            // Still resolve first promise so app doesn't hang
+            if (resolveRef.current) {
+              resolveRef.current(pos);
+              resolveRef.current = null;
+            }
+            return;
+          }
+
+          // Smooth coordinates to reduce jitter
+          const smoothLat = smoothCoord(lastGoodRef.current.lat, latitude);
+          const smoothLng = smoothCoord(lastGoodRef.current.lng, longitude);
+          lastGoodRef.current = { lat: smoothLat, lng: smoothLng };
+
           setState({
             granted: true,
             denied: false,
             loading: false,
-            lat: pos.coords.latitude,
-            lng: pos.coords.longitude,
-            altitude: pos.coords.altitude,
-            accuracy: pos.coords.accuracy,
+            lat: smoothLat,
+            lng: smoothLng,
+            altitude,
+            accuracy,
             error: null,
             watchId,
           });
-          // Resolve the promise on first successful position
+
           if (resolveRef.current) {
             resolveRef.current(pos);
             resolveRef.current = null;
@@ -61,8 +88,8 @@ export function useGeolocation() {
         },
         {
           enableHighAccuracy: true,
-          maximumAge: 5000,
-          timeout: 25000,
+          maximumAge: 2000,   // Tighter: 2s max stale position
+          timeout: 15000,     // Faster timeout
         }
       );
 
