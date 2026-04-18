@@ -41,8 +41,8 @@ export function useMediaCapture() {
         const stream = await navigator.mediaDevices.getUserMedia({
           video: {
             facingMode: facing === 'user' ? 'user' : 'environment',
-            width:  { ideal: isBack ? 3840 : 1920 },
-            height: { ideal: isBack ? 2160 : 1080 },
+            width:  { ideal: isBack ? 4096 : 1920 },
+            height: { ideal: isBack ? 3072 : 1080 },
           },
         });
         const video = document.createElement('video');

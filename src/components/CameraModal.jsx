@@ -2,14 +2,15 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { preloadNsfwModel } from '../services/nsfwFilter';
 
 const MAX_VIDEO_SECONDS = 15;
-const MAX_IMAGE_DIMENSION = 2560;      // 2K — sharp even on retina displays
-const IMAGE_QUALITY = 0.88;            // webp quality — higher fidelity
-const VIDEO_BITRATE = 2_500_000;       // 2.5 Mbps — crisp 1080p for 15s ≈ 4.7 MB
-const AUDIO_BITRATE = 96_000;          // 96 kbps — clearer audio
-const MAX_UPLOAD_BYTES = 8 * 1024 * 1024;  // 8 MB — room for quality
+const MAX_IMAGE_DIMENSION = 4096;      // Full 4K — modern phones capture 48MP+
+const IMAGE_QUALITY = 0.85;            // Slightly lower quality offsets larger resolution
+const VIDEO_BITRATE = 4_000_000;       // 4 Mbps — crisp 1080p@60fps for 15s ≈ 7.5 MB
+const AUDIO_BITRATE = 128_000;         // 128 kbps — broadcast quality
+const MAX_UPLOAD_BYTES = 10 * 1024 * 1024; // 10 MB — room for 4K
 
 // Resize + re-encode a source canvas so large phone captures don't bloat
 // Storage. Returns { previewUrl, blob } or rejects if blob > MAX_UPLOAD_BYTES.
+// Try AVIF first (20-30% better compression), fall back to WebP
 function compressCanvasToWebp(source, facing) {
   return new Promise((resolve, reject) => {
     const sw = source.width;
@@ -30,18 +31,29 @@ function compressCanvasToWebp(source, facing) {
     }
     ctx.drawImage(source, 0, 0, dw, dh);
 
-    const previewUrl = out.toDataURL('image/webp', IMAGE_QUALITY);
-    out.toBlob(
-      (blob) => {
-        if (!blob) return reject(new Error('Falha ao codificar imagem'));
-        if (blob.size > MAX_UPLOAD_BYTES) {
-          return reject(new Error('Imagem muito grande mesmo apos compressao'));
-        }
-        resolve({ previewUrl, blob });
-      },
-      'image/webp',
-      IMAGE_QUALITY
-    );
+    const previewUrl = out.toDataURL('image/webp', 0.6); // lightweight preview
+
+    const tryEncode = (format, quality) => {
+      return new Promise((res) => {
+        out.toBlob((blob) => res(blob), format, quality);
+      });
+    };
+
+    (async () => {
+      // Try AVIF first (better compression at same quality)
+      let blob = await tryEncode('image/avif', 0.80);
+
+      // Fallback to WebP if AVIF not supported or too large
+      if (!blob || blob.size > MAX_UPLOAD_BYTES) {
+        blob = await tryEncode('image/webp', IMAGE_QUALITY);
+      }
+
+      if (!blob) return reject(new Error('Falha ao codificar imagem'));
+      if (blob.size > MAX_UPLOAD_BYTES) {
+        return reject(new Error('Imagem muito grande mesmo apos compressao'));
+      }
+      resolve({ previewUrl, blob });
+    })();
   });
 }
 
@@ -108,7 +120,7 @@ function releaseArCamera() {
 function restoreArCamera(arVideo) {
   if (!arVideo) return;
   navigator.mediaDevices
-    .getUserMedia({ video: { facingMode: 'environment', width: { ideal: 2560 }, height: { ideal: 1440 } }, audio: false })
+    .getUserMedia({ video: { facingMode: 'environment', width: { ideal: 3840 }, height: { ideal: 1920 } }, audio: false })
     .then((stream) => {
       arVideo.srcObject = stream;
       return arVideo.play().catch(() => {});
@@ -205,12 +217,12 @@ export default function CameraModal({ onClose, onCapture, initialMode = 'photo' 
               facingMode: facing,
               width:     { ideal: isBack ? 1920 : 1280 },
               height:    { ideal: isBack ? 1080 : 720 },
-              frameRate: { ideal: 30, max: 60 },
+              frameRate: { ideal: 60, max: 60 },
             }
           : {
               facingMode: facing,
-              width:  { ideal: isBack ? 3840 : 1920 },
-              height: { ideal: isBack ? 2160 : 1080 },
+              width:  { ideal: isBack ? 4096 : 1920 },
+              height: { ideal: isBack ? 3072 : 1080 },
             };
 
         const stream = await requestStreamWithRetry({ video: videoConstraints, audio: false });

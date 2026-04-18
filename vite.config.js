@@ -52,9 +52,9 @@ export default defineConfig({
         cleanupOutdatedCaches: true,
         skipWaiting: true,
         clientsClaim: true,
-        globPatterns: ['**/*.{css,html,svg,png,woff2}'],
+        globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
         globIgnores: ['**/group1-shard*', '**/tfjs*', '**/nsfw-ai*', '**/godmode*'],
-        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024, // 5MB
+        maximumFileSizeToCacheInBytes: 20 * 1024 * 1024, // 20MB — modern phones have plenty
         // App is at /app.html now; /index.html is the static LP and must not
         // be used as SPA fallback.
         navigateFallback: '/app.html',

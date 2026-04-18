@@ -79,8 +79,8 @@ export default function ARScene({ capsules, pings, onCapsuleClick, onVortexClick
     // AR.js will pass sourceWidth/Height to getUserMedia as {ideal}.
     // Portrait phones: swap so the long axis matches the screen.
     const portrait = window.innerHeight > window.innerWidth;
-    const sw = portrait ? 1440 : 2560;
-    const sh = portrait ? 2560 : 1440;
+    const sw = portrait ? 1920 : 3840;
+    const sh = portrait ? 3840 : 1920;
     scene.setAttribute('arjs', `sourceType: webcam; debugUIEnabled: false; videoTexture: true; sourceWidth: ${sw}; sourceHeight: ${sh}; displayWidth: ${window.innerWidth * dpr}; displayHeight: ${window.innerHeight * dpr}`);
 
     const camera = document.createElement('a-camera');

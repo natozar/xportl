@@ -119,8 +119,8 @@ export function registerXPortlComponents() {
       this._flickerEnd = 0;
     },
     tick(time) {
-      // Throttle to ~15fps
-      if (time - this._lastTick < 66) return;
+      // Throttle to ~30fps for smooth glow
+      if (time - this._lastTick < 33) return;
       this._lastTick = time;
 
       const mesh = this.el.getObject3D('mesh');
