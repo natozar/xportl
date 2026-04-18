@@ -33,10 +33,10 @@ function isSupabaseConfigured() {
 // ── Rarity & type config ──
 
 export const RARITIES = {
-  common:    { key: 'common',    label: 'Comum',     color: '#a0a0b0', icon: '○', scale: 1.0, minLevel: 1 },
-  rare:      { key: 'rare',      label: 'Rara',      color: '#3b82f6', icon: '◆', scale: 1.15, minLevel: 5 },
-  legendary: { key: 'legendary', label: 'Lendaria',  color: '#f59e0b', icon: '★', scale: 1.35, minLevel: 15 },
-  mythic:    { key: 'mythic',    label: 'Mitica',     color: '#ec4899', icon: '✦', scale: 1.5, minLevel: 30 },
+  common:    { key: 'common',    label: 'Comum',     color: '#a0a0b0', icon: '○', scale: 1.0, minLevel: 1,  dailyLimit: null },
+  rare:      { key: 'rare',      label: 'Rara',      color: '#3b82f6', icon: '◆', scale: 1.15, minLevel: 5,  dailyLimit: 3 },
+  legendary: { key: 'legendary', label: 'Lendaria',  color: '#f59e0b', icon: '★', scale: 1.35, minLevel: 15, dailyLimit: 1 },
+  mythic:    { key: 'mythic',    label: 'Mitica',     color: '#ec4899', icon: '✦', scale: 1.5, minLevel: 30, dailyLimit: 1 },
 };
 
 export const CAPSULE_TYPES = {
@@ -47,6 +47,28 @@ export const CAPSULE_TYPES = {
   collab:    { key: 'collab',    label: 'Collab',     icon: '🎨', desc: 'Mural coletivo — todos adicionam' },
   auction:   { key: 'auction',   label: 'Leilao',     icon: '💎', desc: 'Custa XP para abrir' },
 };
+
+/**
+ * Check how many capsules of a given rarity the user created today.
+ * Returns { used, limit, allowed }.
+ */
+export async function checkRarityLimit(userId, rarityKey) {
+  const rarity = RARITIES[rarityKey];
+  if (!rarity || !rarity.dailyLimit) return { used: 0, limit: null, allowed: true };
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const { count, error } = await supabase
+    .from('capsules')
+    .select('id', { count: 'exact', head: true })
+    .eq('created_by', userId)
+    .eq('rarity', rarityKey)
+    .gte('created_at', today.toISOString());
+
+  const used = error ? 0 : (count || 0);
+  return { used, limit: rarity.dailyLimit, allowed: used < rarity.dailyLimit };
+}
 
 export function getRarity(capsule) {
   return RARITIES[capsule?.rarity] || RARITIES.common;

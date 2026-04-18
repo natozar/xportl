@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useMediaCapture } from '../hooks/useMediaCapture';
 import { preloadNsfwModel } from '../services/nsfwFilter';
-import { RARITIES, CAPSULE_TYPES } from '../services/capsules';
+import { RARITIES, CAPSULE_TYPES, checkRarityLimit } from '../services/capsules';
 import { calculateLevel } from '../services/gamification';
 import { supabase } from '../services/supabase';
 import CameraModal from './CameraModal';
@@ -32,6 +32,7 @@ export default function LeaveTraceButton({ onPress, saving }) {
   const [cameraOpen, setCameraOpen] = useState(null);
   const [placementMode, setPlacementMode] = useState(false);
   const [userLevel, setUserLevel] = useState(1);
+  const [userId, setUserId] = useState(null);
   const pendingDataRef = useRef(null);
   const inputRef = useRef(null);
   const { media, recording, scanning, moderationError, acceptCapturedMedia, startAudioRecording, stopAudioRecording, clearMedia, dismissModerationError } = useMediaCapture();
@@ -40,6 +41,7 @@ export default function LeaveTraceButton({ onPress, saving }) {
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
       if (!data?.user?.id) return;
+      setUserId(data.user.id);
       supabase.from('user_profiles').select('xp').eq('id', data.user.id).single()
         .then(({ data: p }) => { if (p?.xp) setUserLevel(calculateLevel(p.xp)); });
     });
@@ -69,6 +71,15 @@ export default function LeaveTraceButton({ onPress, saving }) {
     if (userLevel < currentRarity.minLevel) {
       alert(`Voce precisa ser nivel ${currentRarity.minLevel} para criar capsulas ${currentRarity.label}. Seu nivel atual: ${userLevel}.`);
       return;
+    }
+
+    // Rarity daily limit
+    if (currentRarity.dailyLimit) {
+      const { allowed, used, limit } = await checkRarityLimit(userId, currentRarity.key);
+      if (!allowed) {
+        alert(`Limite diario atingido: ${used}/${limit} capsulas ${currentRarity.label} hoje.`);
+        return;
+      }
     }
 
     let unlockDate = null;
@@ -375,6 +386,7 @@ export default function LeaveTraceButton({ onPress, saving }) {
                         <span style={{ fontSize: '1rem' }}>{r.icon}</span>
                         <span style={st.rarityName}>{r.label}</span>
                         {locked && <span style={st.rarityLock}>Nv.{r.minLevel}</span>}
+                        {!locked && r.dailyLimit && <span style={st.rarityLock}>{r.dailyLimit}/dia</span>}
                       </button>
                     );
                   })}
