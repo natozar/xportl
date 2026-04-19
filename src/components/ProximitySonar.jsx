@@ -140,6 +140,9 @@ export default function ProximitySonar({
     return () => {
       if (pulseTimerRef.current) { clearInterval(pulseTimerRef.current); pulseTimerRef.current = null; }
     };
+    // target.id is the meaningful identity; tracking the whole object would
+    // re-run on every capsule list reshuffle.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active, sonarActive, target?.id, distance, userLat, userLng, getHeading, lowBattery, isNight]);
 
   // ── Cleanup on unmount ──

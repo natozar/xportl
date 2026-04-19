@@ -16,7 +16,7 @@ const MAX_CAPTION = 280;
 export default function CreatePost({ onPost, onClose, saving }) {
   const videoRef = useRef(null);
   const streamRef = useRef(null);
-  const canvasRef = useRef(null);
+  const _canvasRef = useRef(null);
 
   const [phase, setPhase] = useState('camera'); // camera | preview | posting
   const [facing, setFacing] = useState('environment');

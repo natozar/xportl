@@ -263,6 +263,9 @@ export default function App() {
 
     loadProfile();
     return () => { cancelled = true; };
+    // user.id scopes re-runs; the full session.user identity churns on every
+    // auth event and would cause redundant profile fetches.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session?.user?.id, ready]);
 
   // ── Handle ToS acceptance ──
@@ -365,6 +368,9 @@ export default function App() {
         }
       })();
     }
+    // Share-link handling fires once on ready; we don't want this to re-run
+    // every GPS tick. Distance is captured opportunistically at open time.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready]);
 
   // ── Realtime subscription ──

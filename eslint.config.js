@@ -42,6 +42,8 @@ export default [
         confirm: 'readonly',
         btoa: 'readonly',
         atob: 'readonly',
+        performance: 'readonly',
+        caches: 'readonly',
       },
     },
     rules: {

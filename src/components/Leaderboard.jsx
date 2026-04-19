@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { getLeaderboard, BADGES, getLevelTitle } from '../services/gamification';
+import { getLeaderboard, getLevelTitle } from '../services/gamification';
 
 export default function Leaderboard({ currentUserId, onClose }) {
   const [leaders, setLeaders] = useState([]);

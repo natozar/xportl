@@ -318,18 +318,21 @@ export default function ARScene({ capsules, pings, onCapsuleClick, onVortexClick
       wrapper.appendChild(beam);
     }
 
+    // Snapshot the entities Map so cleanup uses the same reference the effect
+    // saw on mount, satisfying react-hooks/exhaustive-deps.
+    const entities = entitiesRef.current;
     scene.appendChild(wrapper);
-    entitiesRef.current.set(key, wrapper);
+    entities.set(key, wrapper);
 
     const cleanup = setTimeout(() => {
       try { wrapper.parentNode?.removeChild(wrapper); } catch { /* already removed */ }
-      entitiesRef.current.delete(key);
+      entities.delete(key);
     }, 2800);
 
     return () => {
       clearTimeout(cleanup);
       try { wrapper.parentNode?.removeChild(wrapper); } catch { /* already removed */ }
-      entitiesRef.current.delete(key);
+      entities.delete(key);
     };
   }, [arrivalBurstCapsuleId, capsules]);
 

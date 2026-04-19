@@ -15,7 +15,7 @@ if ('serviceWorker' in navigator) {
 }
 
 // PWA update notification — show toast when new version available
-const updateSW = registerSW({
+registerSW({
   immediate: true,
   onNeedRefresh() {
     // Create update toast
@@ -40,38 +40,39 @@ const updateSW = registerSW({
   },
 });
 
-// Global error tracking
+// Global error tracking. Uses dynamic import() (ESM-safe) instead of require,
+// which was silently throwing ReferenceError and killing the entire pipeline.
+const reportError = (payload) => {
+  import('./services/supabase')
+    .then(({ supabase }) => supabase.from('error_events').insert(payload))
+    .catch(() => { /* supabase unavailable — swallow */ });
+};
+
 window.addEventListener('error', (event) => {
   console.error('[XPortl] Global error:', event.message);
-  try {
-    const { supabase } = require('./services/supabase');
-    supabase.from('error_events').insert({
-      source: 'client',
-      error_name: 'JS_ERROR',
-      error_message: event.message,
-      error_stack: event.error?.stack || null,
-      url: event.filename,
-      user_agent: navigator.userAgent,
-      severity: 'error',
-      metadata: { lineno: event.lineno, colno: event.colno },
-    }).catch(() => {});
-  } catch { /* supabase not loaded yet */ }
+  reportError({
+    source: 'client',
+    error_name: 'JS_ERROR',
+    error_message: event.message,
+    error_stack: event.error?.stack || null,
+    url: event.filename,
+    user_agent: navigator.userAgent,
+    severity: 'error',
+    metadata: { lineno: event.lineno, colno: event.colno },
+  });
 });
 
 window.addEventListener('unhandledrejection', (event) => {
   console.error('[XPortl] Unhandled rejection:', event.reason);
-  try {
-    const { supabase } = require('./services/supabase');
-    supabase.from('error_events').insert({
-      source: 'client',
-      error_name: 'UNHANDLED_REJECTION',
-      error_message: String(event.reason),
-      error_stack: event.reason?.stack || null,
-      url: window.location.href,
-      user_agent: navigator.userAgent,
-      severity: 'error',
-    }).catch(() => {});
-  } catch { /* supabase not loaded yet */ }
+  reportError({
+    source: 'client',
+    error_name: 'UNHANDLED_REJECTION',
+    error_message: String(event.reason),
+    error_stack: event.reason?.stack || null,
+    url: window.location.href,
+    user_agent: navigator.userAgent,
+    severity: 'error',
+  });
   event.preventDefault();
 });
 

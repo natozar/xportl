@@ -61,7 +61,7 @@ export async function checkChainEligibility(userId, lat, lng) {
 /**
  * ── Challenge: mark challenge as completed ──
  */
-export async function completeChallenge(capsuleId, userId, proofBlob, proofType) {
+export async function completeChallenge(capsuleId, userId, _proofBlob, _proofType) {
   const { error } = await supabase.from('capsule_interactions').insert({
     capsule_id: capsuleId,
     user_id: userId,

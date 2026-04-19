@@ -280,7 +280,7 @@ export default function CameraModal({ onClose, onCapture, initialMode = 'photo' 
     setFacing((f) => (f === 'environment' ? 'user' : 'environment'));
   }, []);
 
-  const toggleMode = useCallback(() => {
+  const _toggleMode = useCallback(() => {
     setMode((m) => (m === 'photo' ? 'video' : 'photo'));
   }, []);
 

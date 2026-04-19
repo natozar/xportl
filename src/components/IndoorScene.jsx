@@ -278,19 +278,17 @@ export default function IndoorScene({ capsules, onCapsuleFound, onClose }) {
 
 // ── WebGL drawing helpers (minimal, no Three.js dependency) ──
 
-function drawPlanes(gl, planes, glLayer) {
+function drawPlanes(gl, planes, _glLayer) {
   // Lightweight plane visualization — colored quads at detected positions
   // Full Three.js integration would go here for production
-  for (const plane of planes) {
-    const color = plane.semanticLabel === 'wall' ? [0, 0.94, 1, 0.06] :
-                  plane.semanticLabel === 'floor' ? [0.7, 0.29, 1, 0.04] :
-                  [1, 1, 1, 0.03];
-    // In production: render actual polygon mesh from plane.vertices
-    // For now: the WebXR compositor handles passthrough camera
+  for (const _plane of planes) {
+    // In production: pick color by plane.semanticLabel (wall/floor/other)
+    // and render actual polygon mesh from _plane.vertices.
+    // For now: the WebXR compositor handles passthrough camera.
   }
 }
 
-function drawReticle(gl, hit, glLayer) {
+function drawReticle(_gl, _hit, _glLayer) {
   // In production: draw a targeting reticle at the hit point
   // The DOM overlay handles most of the UI feedback
 }

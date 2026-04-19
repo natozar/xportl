@@ -98,6 +98,9 @@ export default function CapsuleFoundAnimation({ capsule, onClose, onOpen }) {
       clearTimeout(t1); clearTimeout(t2); clearTimeout(t3);
       try { audioCtxRef.current?.close(); } catch { /* already closed */ }
     };
+    // capsule.id uniquely identifies the capsule; tracking the whole object
+    // would fire redundantly on prop reassignment.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [capsule?.id, isRare]);
 
   if (!capsule) return null;
