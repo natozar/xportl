@@ -22,6 +22,7 @@ import SettingsPage from './components/SettingsPage';
 import NotificationsPage from './components/NotificationsPage';
 import VisualMatcher from './components/VisualMatcher';
 import LockOnOverlay from './components/LockOnOverlay';
+import ProximitySonar from './components/ProximitySonar';
 import { getUnreadCount } from './services/notifications';
 import { useGeolocation } from './hooks/useGeolocation';
 import { useCamera } from './hooks/useCamera';
@@ -686,6 +687,9 @@ export default function App() {
               />
             ) : null;
           })()}
+
+          {/* Sonar — vibration + spatial audio guide to nearest capsule */}
+          <ProximitySonar capsules={nearbyCapsules} userLat={geo.lat} userLng={geo.lng} />
 
           <div style={styles.overlay}>
             <Radar lat={geo.lat} lng={geo.lng} accuracy={geo.accuracy} nearbyCount={nearbyCapsules.length} scanRadius={SCAN_RADIUS} />
