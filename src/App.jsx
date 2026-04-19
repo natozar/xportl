@@ -335,7 +335,10 @@ export default function App() {
       // Fetch the capsule and open it
       (async () => {
         const { data } = await supabase.from('capsules').select('*').eq('id', shared.id).single();
-        if (data) setSelectedCapsule({ ...data, distance_meters: 0 });
+        if (data) {
+          const d = (geo.lat && geo.lng) ? haversineDistance(geo.lat, geo.lng, data.lat, data.lng) : 0;
+          setSelectedCapsule({ ...data, distance_meters: d });
+        }
       })();
     }
   }, [ready]);
@@ -701,7 +704,12 @@ export default function App() {
           onOpenCapsule={(capsuleId) => {
             setActiveTab('explore');
             supabase.from('capsules').select('*').eq('id', capsuleId).single()
-              .then(({ data }) => { if (data) setSelectedCapsule({ ...data, distance_meters: 0 }); });
+              .then(({ data }) => {
+                if (data) {
+                  const d = (geo.lat && geo.lng) ? haversineDistance(geo.lat, geo.lng, data.lat, data.lng) : 0;
+                  setSelectedCapsule({ ...data, distance_meters: d });
+                }
+              });
           }}
         />
       )}

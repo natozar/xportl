@@ -50,11 +50,13 @@ export default function CapsuleModal({ capsule, onClose, onSelfDestruct, onRepor
     consumedRef.current = false;
   }, [capsule?.id]);
 
-  // Consume view
+  // Consume view — only when close enough
   useEffect(() => {
     if (!capsule || locked || consumedRef.current) return;
-    // Don't auto-consume for auction type (requires XP payment)
     if (capsuleType === 'auction') return;
+    // Don't consume if too far
+    const d = capsule.distance_meters;
+    if (d !== undefined && d > 10) return;
     consumedRef.current = true;
     const isFake = capsule.id?.startsWith('created_') || capsule.id?.startsWith('local_');
     if (!isFake) {
@@ -63,9 +65,11 @@ export default function CapsuleModal({ capsule, onClose, onSelfDestruct, onRepor
     haptic([60, 30, 60]);
   }, [capsule, locked, capsuleType]);
 
-  // Load comments
+  // Load comments — only when close enough
   useEffect(() => {
     if (!capsule || locked) return;
+    const d = capsule.distance_meters;
+    if (d !== undefined && d > 10) return;
     const isFake = capsule.id?.startsWith('created_') || capsule.id?.startsWith('local_');
     if (isFake) return;
     getComments(capsule.id).then(setComments).catch(() => {});
@@ -190,11 +194,18 @@ export default function CapsuleModal({ capsule, onClose, onSelfDestruct, onRepor
 
   const hasMedia = capsule.media_url && (capsule.media_type === 'image' || capsule.media_type === 'video');
 
+  // ── Distance gate: must be within 10m to see content ──
+  // GPS has ~5-10m accuracy, so 10m gives margin while preventing
+  // opening capsules from another location entirely.
+  const OPEN_RADIUS = 10; // meters
+  const dist = capsule.distance_meters;
+  const tooFar = dist !== undefined && dist > OPEN_RADIUS;
+
   // Chain blocked — can't see content
   const chainBlocked = capsuleType === 'chain' && typeAction === 'blocked';
   // Auction gated — must pay XP first
   const auctionGated = capsuleType === 'auction' && typeAction === 'auction_gate';
-  const contentHidden = chainBlocked || auctionGated;
+  const contentHidden = tooFar || chainBlocked || auctionGated;
 
   return (
     <div style={st.overlay}>
@@ -229,6 +240,23 @@ export default function CapsuleModal({ capsule, onClose, onSelfDestruct, onRepor
           <p style={{ color: '#8888a0', fontSize: '0.75rem', margin: '0 0 12px' }}>Volte em</p>
           <div style={{ color: '#b44aff', fontSize: '2.5rem', fontWeight: 700, textShadow: '0 0 30px rgba(180,74,255,0.4)' }}>{timeLeft || '...'}</div>
           <p style={{ color: '#6b6b80', fontSize: '0.65rem', marginTop: 14 }}>para desbloquear este portal</p>
+        </div>
+      ) : tooFar ? (
+        /* ── Too far — must be within 10m ── */
+        <div style={st.lockedCenter}>
+          <div style={{ fontSize: '3rem', marginBottom: 16 }}>📍</div>
+          <h2 style={{ color: '#00f0ff', fontSize: '0.85rem', fontWeight: 700, letterSpacing: '0.15em', margin: '0 0 12px' }}>
+            MUITO LONGE
+          </h2>
+          <p style={{ color: '#8888a0', fontSize: '0.75rem', textAlign: 'center', maxWidth: 260, lineHeight: 1.6, margin: '0 0 12px' }}>
+            Voce precisa estar a menos de {OPEN_RADIUS}m deste portal para abri-lo.
+          </p>
+          <div style={{ color: '#00f0ff', fontSize: '2rem', fontWeight: 700, textShadow: '0 0 20px rgba(0,240,255,0.3)' }}>
+            {dist < 1000 ? `${dist.toFixed(0)}m` : `${(dist / 1000).toFixed(1)}km`}
+          </div>
+          <p style={{ color: '#6b6b80', fontSize: '0.6rem', marginTop: 12 }}>
+            Siga os indicadores direcionais para encontrar o portal
+          </p>
         </div>
       ) : contentHidden ? (
         /* ── Chain blocked or Auction gate ── */
