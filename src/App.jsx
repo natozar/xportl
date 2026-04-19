@@ -21,6 +21,7 @@ import ProfilePage from './components/ProfilePage';
 import SettingsPage from './components/SettingsPage';
 import NotificationsPage from './components/NotificationsPage';
 import VisualMatcher from './components/VisualMatcher';
+import LockOnOverlay from './components/LockOnOverlay';
 import { getUnreadCount } from './services/notifications';
 import { useGeolocation } from './hooks/useGeolocation';
 import { useCamera } from './hooks/useCamera';
@@ -670,6 +671,9 @@ export default function App() {
             userLng={geo.lng}
             onSelect={handleCapsuleClick}
           />
+
+          {/* Lock-on targeting — replaces 3D raycaster for tapping capsules */}
+          <LockOnOverlay capsules={nearbyCapsules} onSelect={handleCapsuleClick} />
 
           {/* Visual matcher — activates for nearest directional capsule within 15m */}
           {(() => {
