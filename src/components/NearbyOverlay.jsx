@@ -1,16 +1,18 @@
-import { useState, useEffect, useRef } from 'react';
-import { isCapsuleLocked, isGhostCapsule, getRarity, getCapsuleType } from '../services/capsules';
+import { useState, useEffect } from 'react';
+import { getRarity, getCapsuleType } from '../services/capsules';
 import { useDeviceOrientation } from '../hooks/useDeviceOrientation';
 
 /**
- * NearbyOverlay — directional edge indicators only.
+ * NearbyOverlay — minimal directional indicators.
  *
- * Shows small arrow pointers around the screen edge pointing
- * toward each capsule's real-world bearing. Tapping an arrow
- * opens the capsule modal. Capsules are NEVER rendered as
- * floating orbs — that's ARScene's job via GPS coordinates.
+ * Only shows individual indicators for capsules within 30m.
+ * Everything else is just a count in the badge.
+ * Indicators are NOT tappable — the LockOnOverlay handles interaction.
  */
-export default function NearbyOverlay({ capsules, userLat, userLng, onSelect }) {
+
+const INDICATOR_RADIUS = 30; // Only show arrows for capsules within this range
+
+export default function NearbyOverlay({ capsules, userLat, userLng }) {
   const [heading, setHeading] = useState(0);
   const { getPitch } = useDeviceOrientation();
 
@@ -27,125 +29,63 @@ export default function NearbyOverlay({ capsules, userLat, userLng, onSelect }) 
     };
   }, []);
 
-  const nearby = (capsules || []).filter((c) =>
-    c.content?.type !== 'ping' && (c.distance_meters === undefined || c.distance_meters <= 500)
+  const allNearby = (capsules || []).filter((c) =>
+    c.content?.type !== 'ping' && c.distance_meters !== undefined && c.distance_meters <= 500
   );
 
-  if (nearby.length === 0) return null;
+  // Only show individual indicators for close capsules
+  const closeEnough = allNearby.filter((c) => c.distance_meters <= INDICATOR_RADIUS);
+  const farCount = allNearby.length - closeEnough.length;
+
+  if (allNearby.length === 0) return null;
 
   return (
     <div style={s.container}>
-      {nearby.map((cap) => {
+      {/* Individual direction indicators (≤30m only) */}
+      {closeEnough.map((cap) => {
         const bearing = (userLat && userLng)
-          ? getBearing(userLat, userLng, cap.lat, cap.lng)
-          : 0;
+          ? getBearing(userLat, userLng, cap.lat, cap.lng) : 0;
 
         let relAngle = bearing - heading;
         while (relAngle > 180) relAngle -= 360;
         while (relAngle < -180) relAngle += 360;
 
         const dist = cap.distance_meters || 0;
-        const locked = isCapsuleLocked(cap);
         const rarity = getRarity(cap);
-        const cType = getCapsuleType(cap);
-        const useRarityColor = rarity.key !== 'common';
-        const color = useRarityColor ? rarity.color : locked ? '#b44aff' : '#00f0ff';
+        const color = rarity.key !== 'common' ? rarity.color : '#00f0ff';
+        const distLabel = dist < 1 ? '<1m' : `${dist.toFixed(0)}m`;
 
-        // Place indicator on screen edge based on relative angle.
-        // ±60° = within camera FOV → top edge
-        // ±60-120° = sides
-        // >120° = bottom edge (behind you)
+        // Position on screen edge
         const absAngle = Math.abs(relAngle);
         let posStyle;
-
         if (absAngle <= 60) {
-          // Top edge — horizontal position maps angle to screen width
-          const x = 50 + (relAngle / 60) * 45;
-          posStyle = { top: 0, left: `${x}%`, transform: 'translateX(-50%)' };
+          const x = 50 + (relAngle / 60) * 42;
+          posStyle = { top: 6, left: `${x}%`, transform: 'translateX(-50%)' };
         } else if (absAngle <= 120) {
-          // Side edges
           const side = relAngle > 0 ? 'right' : 'left';
-          const verticalT = (absAngle - 60) / 60; // 0 at 60°, 1 at 120°
-          const y = 10 + verticalT * 50; // 10%-60% from top
-          posStyle = { top: `${y}%`, [side]: 0, transform: 'translateY(-50%)' };
+          const y = 15 + ((absAngle - 60) / 60) * 40;
+          posStyle = { top: `${y}%`, [side]: 6, transform: 'translateY(-50%)' };
         } else {
-          // Bottom edge — behind user
-          const x = 50 - ((relAngle > 0 ? 180 - relAngle : -180 - relAngle) / 60) * 45;
-          posStyle = { bottom: 0, left: `${Math.max(5, Math.min(95, x))}%`, transform: 'translateX(-50%)' };
+          const x = 50 - ((relAngle > 0 ? 180 - relAngle : -180 - relAngle) / 60) * 42;
+          posStyle = { bottom: 80, left: `${Math.max(8, Math.min(92, x))}%`, transform: 'translateX(-50%)' };
         }
-
-        const distLabel = dist < 1 ? 'aqui' : dist < 1000 ? `${dist.toFixed(0)}m` : `${(dist / 1000).toFixed(1)}km`;
-
-        // For directional capsules within 50m, show warmth indicator
-        const hasDirection = cap.heading_deg !== null && cap.heading_deg !== undefined;
-        let warmth = null; // null = no direction, 0-1 = cold to hot
-        if (hasDirection && dist < 50) {
-          let hDiff = heading - cap.heading_deg;
-          hDiff = ((hDiff + 180) % 360 + 360) % 360 - 180;
-          const pDiff = (getPitch() || 0) - (cap.pitch_deg || 0);
-          const totalDiff = Math.sqrt(hDiff * hDiff + pDiff * pDiff);
-          warmth = Math.max(0, 1 - totalDiff / 60); // 1 = perfect aim, 0 = 60°+ off
-        }
-
-        // Arrow rotation: point from edge toward center
-        let arrowDeg = 0;
-        if (absAngle <= 60) arrowDeg = 180; // top → points down
-        else if (relAngle > 0 && absAngle <= 120) arrowDeg = 270; // right → points left
-        else if (relAngle < 0 && absAngle <= 120) arrowDeg = 90; // left → points right
-        else arrowDeg = 0; // bottom → points up
 
         return (
-          <button
-            key={cap.id}
-            style={{ ...s.indicator, ...posStyle }}
-            onClick={() => onSelect(cap)}
-          >
-            {/* Arrow */}
-            <svg
-              width="12" height="12" viewBox="0 0 24 24" fill={color}
-              style={{ transform: `rotate(${arrowDeg}deg)`, opacity: 0.7 }}
-            >
-              <path d="M12 4l-6 8h4v8h4v-8h4z" />
-            </svg>
-            {/* Info chip */}
-            <div style={{ ...s.chip, borderColor: `${color}33` }}>
-              {rarity.key !== 'common' && (
-                <span style={{ color: rarity.color, fontSize: '0.55rem', fontWeight: 700 }}>{rarity.icon}</span>
-              )}
-              <span style={{ color, fontSize: '0.5rem', fontWeight: 600 }}>
-                {locked ? '🔒' : cType.icon}
-              </span>
-              <span style={s.chipDist}>{distLabel}</span>
-              {warmth !== null && (
-                <span style={{
-                  fontSize: '0.5rem', fontWeight: 700,
-                  color: warmth > 0.7 ? '#ff3366' : warmth > 0.3 ? '#f59e0b' : '#3b82f6',
-                }}>
-                  {warmth > 0.7 ? '🔥' : warmth > 0.3 ? '🟡' : '❄️'}
-                </span>
-              )}
-            </div>
-            {/* Hint photo thumbnail when close + directional */}
-            {warmth !== null && warmth < 0.7 && cap.hint_photo_url && (
-              <img
-                src={cap.hint_photo_url}
-                alt=""
-                style={{
-                  ...s.hintThumb,
-                  opacity: 0.4 + warmth * 0.4,
-                  filter: `saturate(0) brightness(0.4) sepia(1) hue-rotate(${warmth > 0.3 ? '0' : '180'}deg)`,
-                }}
-              />
-            )}
-          </button>
+          <div key={cap.id} style={{ ...s.indicator, ...posStyle }}>
+            <div style={{ ...s.dot, background: color, boxShadow: `0 0 8px ${color}60` }} />
+            <span style={{ ...s.dist, color }}>{distLabel}</span>
+          </div>
         );
       })}
 
       {/* Count badge */}
       <div style={s.badge}>
         <div style={s.badgeDot} />
-        <span style={s.badgeNum}>{nearby.length}</span>
-        <span style={s.badgeText}>{nearby.length === 1 ? 'portal' : 'portais'}</span>
+        <span style={s.badgeNum}>{allNearby.length}</span>
+        <span style={s.badgeText}>
+          {allNearby.length === 1 ? 'portal' : 'portais'}
+          {farCount > 0 && ` · ${farCount} longe`}
+        </span>
       </div>
     </div>
   );
@@ -163,40 +103,26 @@ function getBearing(lat1, lng1, lat2, lng2) {
 
 const s = {
   container: {
-    position: 'fixed', inset: 0,
-    zIndex: 10000,
-    pointerEvents: 'none',
-    overflow: 'hidden',
+    position: 'fixed', inset: 0, zIndex: 9999,
+    pointerEvents: 'none', overflow: 'hidden',
   },
   indicator: {
     position: 'absolute',
     display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
-    background: 'none', border: 'none', padding: 4,
-    pointerEvents: 'auto',
-    WebkitTapHighlightColor: 'transparent',
-    touchAction: 'manipulation',
-    zIndex: 1,
+    pointerEvents: 'none',
   },
-  chip: {
-    display: 'flex', alignItems: 'center', gap: 3,
-    padding: '3px 8px', borderRadius: 8,
-    background: 'rgba(5,3,15,0.8)',
-    backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)',
-    border: '1px solid rgba(255,255,255,0.06)',
-    whiteSpace: 'nowrap',
+  dot: {
+    width: 8, height: 8, borderRadius: '50%',
   },
-  chipDist: {
-    fontSize: '0.45rem', color: 'rgba(255,255,255,0.35)',
+  dist: {
+    fontSize: '0.45rem', fontWeight: 700,
     fontFamily: 'ui-monospace, monospace',
-  },
-  hintThumb: {
-    width: 48, height: 36, borderRadius: 6, objectFit: 'cover',
-    border: '1px solid rgba(255,255,255,0.1)',
-    pointerEvents: 'none', marginTop: 2,
+    textShadow: '0 1px 3px rgba(0,0,0,0.8)',
   },
   badge: {
-    position: 'absolute', top: 'calc(10px + env(safe-area-inset-top, 0px))', left: '50%',
-    transform: 'translateX(-50%)',
+    position: 'absolute',
+    top: 'calc(10px + env(safe-area-inset-top, 0px))',
+    left: '50%', transform: 'translateX(-50%)',
     display: 'flex', alignItems: 'center', gap: 6,
     padding: '6px 16px', borderRadius: 50,
     background: 'rgba(5,3,15,0.75)',

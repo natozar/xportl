@@ -669,7 +669,6 @@ export default function App() {
             capsules={nearbyCapsules}
             userLat={geo.lat}
             userLng={geo.lng}
-            onSelect={handleCapsuleClick}
           />
 
           {/* Lock-on targeting — replaces 3D raycaster for tapping capsules */}
