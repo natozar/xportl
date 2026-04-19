@@ -681,7 +681,13 @@ export default function App() {
   return (
     <div className="scanlines" style={styles.root}>
       {/* AR scene always mounted (camera stays live even on profile tab) */}
-      <ARScene capsules={nearbyCapsules} pings={activePings} onCapsuleClick={handleCapsuleClick} onVortexClick={handleVortexClick} />
+      <ARScene
+        capsules={nearbyCapsules}
+        pings={activePings}
+        onCapsuleClick={handleCapsuleClick}
+        onVortexClick={handleVortexClick}
+        arrivalBurstCapsuleId={hunt.arrivedAt}
+      />
 
       {/* ── Tab: Explore (AR overlay) ── */}
       {activeTab === 'explore' && (

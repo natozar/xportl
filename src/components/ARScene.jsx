@@ -21,7 +21,7 @@ const RARITY_VFX = {
   mythic:    { rings: 5, emMult: 3.0, haloMult: 2.5, spinSpeed: 2.0 },
 };
 
-export default function ARScene({ capsules, pings, onCapsuleClick, onVortexClick }) {
+export default function ARScene({ capsules, pings, onCapsuleClick, onVortexClick, arrivalBurstCapsuleId }) {
   const sceneContainerRef = useRef(null);
   const sceneRef = useRef(null);
   const entitiesRef = useRef(new Map());
@@ -235,6 +235,103 @@ export default function ARScene({ capsules, pings, onCapsuleClick, onVortexClick
 
     pings.forEach(spawnPing);
   }, [pings]);
+
+  // ── 3D Arrival burst — spawn a volumetric "found" reveal in AR space ──
+  // Renders 3 expanding rings + 12 radial particles at the capsule's GPS
+  // position. Lasts ~2.5s then auto-cleans up.
+  useEffect(() => {
+    const scene = sceneRef.current;
+    if (!scene || !arrivalBurstCapsuleId) return;
+    const cap = capsules.find((c) => c.id === arrivalBurstCapsuleId);
+    if (!cap) return;
+
+    const rarity = getRarity(cap);
+    const color = rarity.key !== 'common' ? rarity.color : '#00f0ff';
+    const key = `burst_${cap.id}_${Date.now()}`;
+
+    const wrapper = document.createElement('a-entity');
+    wrapper.setAttribute('gps-entity-place', `latitude: ${cap.lat}; longitude: ${cap.lng};`);
+    wrapper.setAttribute('fixed-altitude', 'y: 1.2');
+    wrapper.setAttribute('look-at', '[gps-camera]');
+
+    // 3 expanding rings
+    const ringCount = rarity.key === 'mythic' || rarity.key === 'legendary' ? 4 : 3;
+    for (let i = 0; i < ringCount; i++) {
+      const ring = document.createElement('a-ring');
+      ring.setAttribute('radius-inner', '0.15');
+      ring.setAttribute('radius-outer', '0.18');
+      ring.setAttribute('color', color);
+      ring.setAttribute('material', `shader: flat; transparent: true; opacity: ${0.9 - i * 0.15}; side: double`);
+      ring.setAttribute('animation__scale',
+        `property: scale; from: 0.4 0.4 0.4; to: ${10 + i * 3} ${10 + i * 3} 1; dur: ${1400 + i * 200}; easing: easeOutQuart; delay: ${i * 120}`);
+      ring.setAttribute('animation__fade',
+        `property: material.opacity; from: ${0.9 - i * 0.15}; to: 0; dur: ${1400 + i * 200}; easing: easeOutQuad; delay: ${i * 120}`);
+      wrapper.appendChild(ring);
+    }
+
+    // Central flash sphere
+    const flash = document.createElement('a-sphere');
+    flash.setAttribute('radius', '0.35');
+    flash.setAttribute('color', color);
+    flash.setAttribute('material', `shader: flat; transparent: true; opacity: 0.9; emissive: ${color}; emissiveIntensity: 2`);
+    flash.setAttribute('animation__scale',
+      'property: scale; from: 0.3 0.3 0.3; to: 2.2 2.2 2.2; dur: 700; easing: easeOutCubic');
+    flash.setAttribute('animation__fade',
+      'property: material.opacity; from: 0.9; to: 0; dur: 800; easing: easeOutQuad');
+    wrapper.appendChild(flash);
+
+    // Radial particles — spheres flying outward in 3D
+    const particleCount = rarity.key === 'mythic' ? 24 : rarity.key === 'legendary' ? 18 : 12;
+    for (let i = 0; i < particleCount; i++) {
+      const theta = (i / particleCount) * Math.PI * 2;
+      const phi = (Math.random() - 0.5) * 0.8; // slight vertical spread
+      const dist = 2.5 + Math.random() * 1.5;
+      const endX = (Math.cos(theta) * Math.cos(phi) * dist).toFixed(2);
+      const endY = (Math.sin(phi) * dist).toFixed(2);
+      const endZ = (Math.sin(theta) * Math.cos(phi) * dist).toFixed(2);
+
+      const p = document.createElement('a-sphere');
+      p.setAttribute('radius', `${0.04 + Math.random() * 0.04}`);
+      p.setAttribute('color', color);
+      p.setAttribute('material', `shader: flat; emissive: ${color}; emissiveIntensity: 2; transparent: true; opacity: 1`);
+      p.setAttribute('position', '0 0 0');
+      p.setAttribute('animation__fly',
+        `property: position; from: 0 0 0; to: ${endX} ${endY} ${endZ}; dur: 1200; easing: easeOutQuad`);
+      p.setAttribute('animation__fade',
+        'property: material.opacity; from: 1; to: 0; dur: 1200; easing: easeInQuad');
+      wrapper.appendChild(p);
+    }
+
+    // Tall vertical beam (legendary/mythic only) — dramatic column of light
+    if (rarity.key === 'legendary' || rarity.key === 'mythic') {
+      const beam = document.createElement('a-cylinder');
+      beam.setAttribute('radius', '0.15');
+      beam.setAttribute('height', '0.2');
+      beam.setAttribute('color', color);
+      beam.setAttribute('material', `shader: flat; transparent: true; opacity: 0.7; emissive: ${color}; emissiveIntensity: 3`);
+      beam.setAttribute('animation__grow',
+        'property: height; from: 0.2; to: 30; dur: 800; easing: easeOutQuart');
+      beam.setAttribute('animation__pos',
+        'property: position; from: 0 0.1 0; to: 0 15 0; dur: 800; easing: easeOutQuart');
+      beam.setAttribute('animation__fade',
+        'property: material.opacity; from: 0.7; to: 0; dur: 1400; easing: easeOutQuad');
+      wrapper.appendChild(beam);
+    }
+
+    scene.appendChild(wrapper);
+    entitiesRef.current.set(key, wrapper);
+
+    const cleanup = setTimeout(() => {
+      try { wrapper.parentNode?.removeChild(wrapper); } catch { /* already removed */ }
+      entitiesRef.current.delete(key);
+    }, 2800);
+
+    return () => {
+      clearTimeout(cleanup);
+      try { wrapper.parentNode?.removeChild(wrapper); } catch { /* already removed */ }
+      entitiesRef.current.delete(key);
+    };
+  }, [arrivalBurstCapsuleId, capsules]);
 
   // ── Click events ──
   useEffect(() => {
