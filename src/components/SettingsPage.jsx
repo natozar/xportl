@@ -110,6 +110,32 @@ export default function SettingsPage({ session, onBack }) {
           </div>
         )}
 
+        {/* App */}
+        <div style={s.sectionLabel}>APP</div>
+        <div style={s.group}>
+          <button style={s.item} onClick={() => {
+            if ('serviceWorker' in navigator) {
+              navigator.serviceWorker.getRegistrations().then((regs) => {
+                regs.forEach((r) => r.unregister());
+              });
+            }
+            if ('caches' in window) {
+              caches.keys().then((names) => names.forEach((n) => caches.delete(n)));
+            }
+            localStorage.removeItem('xportl_ready');
+            localStorage.removeItem('xportl_onboarding');
+            setTimeout(() => window.location.reload(), 300);
+          }}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" style={{ marginRight: 12, opacity: 0.4 }}>
+              <path d="M4 12a8 8 0 0114-5M20 12a8 8 0 01-14 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+              <polyline points="4 4 4 8 8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+              <polyline points="20 20 20 16 16 16" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            <span style={s.itemText}>Forcar atualizacao</span>
+            <span style={s.itemHint}>Limpa cache</span>
+          </button>
+        </div>
+
         {/* Account */}
         <div style={s.sectionLabel}>CONTA</div>
         <div style={s.group}>
