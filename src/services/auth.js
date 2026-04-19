@@ -40,6 +40,13 @@ export async function signInWithEmail(email, password) {
   return data;
 }
 
+export async function resetPassword(email) {
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: getRedirectUrl(),
+  });
+  if (error) throw error;
+}
+
 // ── Phone + SMS OTP ──
 
 export async function sendPhoneOtp(phone) {

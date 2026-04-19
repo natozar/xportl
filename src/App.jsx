@@ -756,6 +756,7 @@ export default function App() {
         capsule={selectedCapsule}
         onClose={() => setSelectedCapsule(null)}
         onSelfDestruct={handleSelfDestruct}
+        onDeleteOwn={handleSelfDestruct}
         onReport={handleReport}
         userLat={geo.lat}
         userLng={geo.lng}

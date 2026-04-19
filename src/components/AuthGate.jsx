@@ -1,12 +1,23 @@
 import { useState } from 'react';
 import {
   signInWithGoogle,
-  signUpWithEmail, signInWithEmail,
+  signUpWithEmail, signInWithEmail, resetPassword,
   sendPhoneOtp, verifyPhoneOtp,
 } from '../services/auth';
 
+const MIN_AGE = 13;
+
+function calculateAge(birthDate) {
+  const today = new Date();
+  const birth = new Date(birthDate);
+  let age = today.getFullYear() - birth.getFullYear();
+  const m = today.getMonth() - birth.getMonth();
+  if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
+  return age;
+}
+
 export default function AuthGate() {
-  const [mode, setMode] = useState('main'); // main | email | phone | verify-email | verify-phone
+  const [mode, setMode] = useState('main'); // main | email | phone | verify-email | verify-phone | forgot | age-gate
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [_success, setSuccess] = useState(null);
@@ -15,6 +26,7 @@ export default function AuthGate() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isSignUp, setIsSignUp] = useState(false);
+  const [birthDate, setBirthDate] = useState('');
 
   // Phone state
   const [phone, setPhone] = useState('');
@@ -37,6 +49,18 @@ export default function AuthGate() {
 
     try {
       if (isSignUp) {
+        // Age gate: require birth date for new accounts
+        if (!birthDate) {
+          setError('Informe sua data de nascimento');
+          setLoading(false);
+          return;
+        }
+        const age = calculateAge(birthDate);
+        if (age < MIN_AGE) {
+          setError(`Voce precisa ter no minimo ${MIN_AGE} anos para criar uma conta (ECA).`);
+          setLoading(false);
+          return;
+        }
         await signUpWithEmail(email, password);
         setMode('verify-email');
       } else {
@@ -149,6 +173,45 @@ export default function AuthGate() {
     );
   }
 
+  // ── Forgot password ──
+  if (mode === 'forgot') {
+    const handleForgot = async (e) => {
+      e.preventDefault();
+      if (!email || loading) return;
+      setLoading(true); setError(null);
+      try {
+        await resetPassword(email);
+        setSuccess(true);
+      } catch (err) { setError(err.message); }
+      finally { setLoading(false); }
+    };
+
+    return (
+      <Shell>
+        <h2 style={s.formTitle}>REDEFINIR SENHA</h2>
+        {_success ? (
+          <>
+            <p style={s.verifyText}>Enviamos um link de redefinicao para <strong style={{ color: '#00f0ff' }}>{email}</strong>.</p>
+            <button style={s.backBtn} onClick={() => { clearState(); setMode('email'); }}>Voltar ao login</button>
+          </>
+        ) : (
+          <>
+            <p style={s.formSub}>Informe seu e-mail para receber o link de redefinicao</p>
+            <form onSubmit={handleForgot} style={s.form}>
+              <input style={s.input} type="email" placeholder="seu@email.com" value={email}
+                onChange={(e) => setEmail(e.target.value)} autoComplete="email" required />
+              <button style={s.submitBtn} type="submit" disabled={loading}>
+                {loading ? 'Enviando...' : 'Enviar link'}
+              </button>
+            </form>
+            {error && <p style={s.error}>{error}</p>}
+            <button style={s.backBtn} onClick={() => { clearState(); setMode('email'); }}>Voltar</button>
+          </>
+        )}
+      </Shell>
+    );
+  }
+
   // ── Email form ──
   if (mode === 'email') {
     return (
@@ -174,11 +237,29 @@ export default function AuthGate() {
             minLength={6}
             required
           />
+          {isSignUp && (
+            <div>
+              <label style={s.birthLabel}>Data de nascimento</label>
+              <input
+                style={s.input}
+                type="date"
+                value={birthDate}
+                onChange={(e) => setBirthDate(e.target.value)}
+                max={new Date().toISOString().split('T')[0]}
+                required
+              />
+            </div>
+          )}
           <button style={s.submitBtn} type="submit" disabled={loading}>
             {loading ? 'Aguarde...' : isSignUp ? 'Criar conta' : 'Entrar'}
           </button>
         </form>
         {error && <p style={s.error}>{error}</p>}
+        {!isSignUp && (
+          <button style={s.switchBtn} onClick={() => { setError(null); setMode('forgot'); }}>
+            Esqueci minha senha
+          </button>
+        )}
         <button style={s.switchBtn} onClick={() => { setIsSignUp(!isSignUp); setError(null); }}>
           {isSignUp ? 'Ja tem conta? Entrar' : 'Nao tem conta? Criar agora'}
         </button>
@@ -364,6 +445,7 @@ const s = {
   verifyText: { fontSize: '0.75rem', color: 'var(--text-muted)', lineHeight: 1.7, marginBottom: 8 },
   verifyHint: { fontSize: '0.6rem', color: 'rgba(255,255,255,0.2)', marginBottom: 16 },
 
+  birthLabel: { fontSize: '0.6rem', color: 'rgba(255,255,255,0.3)', marginBottom: 4, display: 'block' },
   error: { fontSize: '0.68rem', color: 'var(--danger)', marginTop: 10 },
   legal: {
     fontSize: '0.52rem', color: 'rgba(255,255,255,0.18)', lineHeight: 1.6,

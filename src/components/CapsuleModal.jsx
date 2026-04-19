@@ -4,7 +4,7 @@ import { getComments, addComment } from '../services/comments';
 import { echoReplant, checkChainEligibility, completeChallenge, addCollabEntry, getCollabEntries, auctionBid, getAuctionCost, getEchoCount, hasInteracted } from '../services/interactions';
 import { supabase } from '../services/supabase';
 
-export default function CapsuleModal({ capsule, onClose, onSelfDestruct, onReport, userLat, userLng }) {
+export default function CapsuleModal({ capsule, onClose, onSelfDestruct, onReport, userLat, userLng, onDeleteOwn }) {
   const [viewsLeft, setViewsLeft] = useState(null);
   const [audioPlaying, setAudioPlaying] = useState(false);
   const [comments, setComments] = useState([]);
@@ -225,7 +225,21 @@ export default function CapsuleModal({ capsule, onClose, onSelfDestruct, onRepor
             <span style={st.topChip}>{capsule.distance_meters < 1 ? '<1m' : `${capsule.distance_meters.toFixed(0)}m`}</span>
           )}
         </div>
-        {onReport && !locked && (
+        {/* Delete own capsule */}
+        {userId && capsule.created_by === userId && (
+          <button style={st.reportBtn} onClick={() => {
+            if (confirm('Apagar este portal permanentemente?')) {
+              selfDestruct(capsule.id).catch(() => {});
+              onDeleteOwn?.(capsule.id);
+              onClose();
+            }
+          }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(255,51,102,0.6)" strokeWidth="2" strokeLinecap="round">
+              <path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m-1 0v12a2 2 0 01-2 2H9a2 2 0 01-2-2V6h10z" />
+            </svg>
+          </button>
+        )}
+        {onReport && !locked && userId && capsule.created_by !== userId && (
           <button style={st.reportBtn} onClick={() => { close(); onReport?.(capsule); }}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(255,51,102,0.6)" strokeWidth="2" strokeLinecap="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>
           </button>

@@ -4,21 +4,76 @@ import { registerSW } from 'virtual:pwa-register';
 import App from './App';
 import './styles/global.css';
 
-// Kill-switch: legacy SWs (from earlier dev builds with devOptions.enabled) shipped
-// a `registerSW.js` helper and cached stale bundle hashes. Unregister them before
-// the new SW takes over so users don't get stranded on 404ing asset URLs.
+// Kill-switch: legacy SWs
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.getRegistrations().then((regs) => {
     for (const reg of regs) {
       const url = reg.active?.scriptURL || reg.installing?.scriptURL || '';
-      if (url.includes('registerSW.js')) {
-        reg.unregister();
-      }
+      if (url.includes('registerSW.js')) reg.unregister();
     }
   }).catch(() => {});
 }
 
-registerSW({ immediate: true });
+// PWA update notification — show toast when new version available
+const updateSW = registerSW({
+  immediate: true,
+  onNeedRefresh() {
+    // Create update toast
+    const toast = document.createElement('div');
+    toast.id = 'xportl-update-toast';
+    toast.innerHTML = `
+      <div style="position:fixed;bottom:80px;left:50%;transform:translateX(-50%);z-index:99999;
+        display:flex;align-items:center;gap:10px;padding:12px 20px;
+        background:rgba(10,8,20,0.95);backdrop-filter:blur(20px);
+        border:1px solid rgba(0,240,255,0.2);border-radius:50px;
+        color:#00f0ff;font-size:0.72rem;font-weight:600;font-family:inherit;
+        box-shadow:0 4px 24px rgba(0,0,0,0.5);">
+        <span>Nova versao disponivel</span>
+        <button onclick="document.getElementById('xportl-update-toast').remove();location.reload();"
+          style="padding:6px 14px;border-radius:8px;background:rgba(0,240,255,0.15);
+          border:1px solid rgba(0,240,255,0.3);color:#00f0ff;font-size:0.65rem;
+          font-weight:700;font-family:inherit;cursor:pointer;">
+          Atualizar
+        </button>
+      </div>`;
+    document.body.appendChild(toast);
+  },
+});
+
+// Global error tracking
+window.addEventListener('error', (event) => {
+  console.error('[XPortl] Global error:', event.message);
+  try {
+    const { supabase } = require('./services/supabase');
+    supabase.from('error_events').insert({
+      source: 'client',
+      error_name: 'JS_ERROR',
+      error_message: event.message,
+      error_stack: event.error?.stack || null,
+      url: event.filename,
+      user_agent: navigator.userAgent,
+      severity: 'error',
+      metadata: { lineno: event.lineno, colno: event.colno },
+    }).catch(() => {});
+  } catch { /* supabase not loaded yet */ }
+});
+
+window.addEventListener('unhandledrejection', (event) => {
+  console.error('[XPortl] Unhandled rejection:', event.reason);
+  try {
+    const { supabase } = require('./services/supabase');
+    supabase.from('error_events').insert({
+      source: 'client',
+      error_name: 'UNHANDLED_REJECTION',
+      error_message: String(event.reason),
+      error_stack: event.reason?.stack || null,
+      url: window.location.href,
+      user_agent: navigator.userAgent,
+      severity: 'error',
+    }).catch(() => {});
+  } catch { /* supabase not loaded yet */ }
+  event.preventDefault();
+});
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
