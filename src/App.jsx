@@ -20,6 +20,7 @@ import IndoorScene from './components/IndoorScene';
 import ProfilePage from './components/ProfilePage';
 import SettingsPage from './components/SettingsPage';
 import NotificationsPage from './components/NotificationsPage';
+import VisualMatcher from './components/VisualMatcher';
 import { getUnreadCount } from './services/notifications';
 import { useGeolocation } from './hooks/useGeolocation';
 import { useCamera } from './hooks/useCamera';
@@ -669,6 +670,19 @@ export default function App() {
             userLng={geo.lng}
             onSelect={handleCapsuleClick}
           />
+
+          {/* Visual matcher — activates for nearest directional capsule within 15m */}
+          {(() => {
+            const directional = nearbyCapsules.find((c) =>
+              c.hint_photo_url && c.heading_deg !== null && c.distance_meters <= 15
+            );
+            return directional ? (
+              <VisualMatcher
+                capsule={directional}
+                onMatch={() => handleCapsuleClick(directional)}
+              />
+            ) : null;
+          })()}
 
           <div style={styles.overlay}>
             <Radar lat={geo.lat} lng={geo.lng} accuracy={geo.accuracy} nearbyCount={nearbyCapsules.length} scanRadius={SCAN_RADIUS} />
