@@ -1,36 +1,33 @@
 import { useEffect, useRef, useState } from 'react';
 import { useDeviceOrientation } from '../hooks/useDeviceOrientation';
 import { getRarity } from '../services/capsules';
+import { getBearing } from '../utils/huntable';
 
 /**
- * ProximitySonar — vibration pulses + spatial audio that guide
- * the user toward the nearest capsule. Like a metal detector:
- * pulses get faster and louder as you get closer.
+ * ProximitySonar — metal-detector guide to ONE specific capsule.
  *
- * Also emits a directional audio tone that pans left/right
- * based on the capsule's bearing relative to the user's heading.
+ * Activates only when `target` is passed (hunt mode engaged). When null,
+ * the sonar is fully silent: no audio context, no vibration, no render.
+ *
+ * Distance bands control pulse interval + audio frequency. Panning uses
+ * the bearing to target vs current compass heading for left/right cues.
+ *
+ * Respects: paused state, low battery (softer), night mode (quieter).
  */
 
-// Pulse intervals by distance band (ms between pulses)
 const PULSE_BANDS = [
-  { maxDist: 5,   interval: 300,  pattern: [40, 20, 40] },     // Very close — fast double
-  { maxDist: 15,  interval: 600,  pattern: [30, 15, 30] },     // Close — medium
-  { maxDist: 30,  interval: 1000, pattern: [25] },              // Near — slow single
-  { maxDist: 60,  interval: 1800, pattern: [20] },              // Approaching — gentle
-  { maxDist: 150, interval: 3000, pattern: [15] },              // Far — very slow
+  { maxDist: 5,   interval: 300,  pattern: [40, 20, 40] },
+  { maxDist: 15,  interval: 600,  pattern: [30, 15, 30] },
+  { maxDist: 30,  interval: 1000, pattern: [25] },
+  { maxDist: 60,  interval: 1800, pattern: [20] },
+  { maxDist: 150, interval: 3000, pattern: [15] },
+  { maxDist: 500, interval: 5000, pattern: [10] },
 ];
 
-function getBearing(lat1, lng1, lat2, lng2) {
-  const toRad = (d) => (d * Math.PI) / 180;
-  const toDeg = (r) => (r * 180) / Math.PI;
-  const dLng = toRad(lng2 - lng1);
-  const y = Math.sin(dLng) * Math.cos(toRad(lat2));
-  const x = Math.cos(toRad(lat1)) * Math.sin(toRad(lat2)) -
-    Math.sin(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.cos(dLng);
-  return (toDeg(Math.atan2(y, x)) + 360) % 360;
-}
-
-export default function ProximitySonar({ capsules, userLat, userLng }) {
+export default function ProximitySonar({
+  target, distance, userLat, userLng,
+  paused = false, lowBattery = false, isNight = false,
+}) {
   const { getHeading } = useDeviceOrientation();
   const audioCtxRef = useRef(null);
   const pannerRef = useRef(null);
@@ -40,12 +37,9 @@ export default function ProximitySonar({ capsules, userLat, userLng }) {
   const [sonarActive, setSonarActive] = useState(false);
   const activatedRef = useRef(false);
 
-  // Find nearest capsule
-  const nearest = (capsules || [])
-    .filter((c) => c.content?.type !== 'ping' && c.distance_meters !== undefined && c.distance_meters <= 150)
-    .sort((a, b) => a.distance_meters - b.distance_meters)[0] || null;
+  const active = !!target && !paused;
 
-  // Initialize audio context on first user interaction (required by browsers)
+  // ── Activate audio on first user gesture (browser policy) ──
   useEffect(() => {
     if (activatedRef.current) return;
     const activate = () => {
@@ -56,14 +50,13 @@ export default function ProximitySonar({ capsules, userLat, userLng }) {
         const ctx = new (window.AudioContext || window.webkitAudioContext)();
         audioCtxRef.current = ctx;
 
-        // Create oscillator → panner → gain → destination
         const osc = ctx.createOscillator();
         osc.type = 'sine';
         osc.frequency.value = 440;
 
         const panner = ctx.createStereoPanner();
         const gain = ctx.createGain();
-        gain.gain.value = 0; // start silent
+        gain.gain.value = 0;
 
         osc.connect(panner);
         panner.connect(gain);
@@ -90,48 +83,51 @@ export default function ProximitySonar({ capsules, userLat, userLng }) {
     };
   }, []);
 
-  // Sonar loop: vibrate + spatial audio
+  // ── Sonar loop: vibration + audio ──
   useEffect(() => {
-    if (!nearest || !sonarActive) {
-      // Silence when no target
+    if (!active || !sonarActive) {
       if (gainRef.current) gainRef.current.gain.value = 0;
-      if (pulseTimerRef.current) clearInterval(pulseTimerRef.current);
+      if (pulseTimerRef.current) { clearInterval(pulseTimerRef.current); pulseTimerRef.current = null; }
       return;
     }
 
-    const dist = nearest.distance_meters;
-    const rarity = getRarity(nearest);
+    const dist = distance ?? target.distance_meters ?? 0;
+    const rarity = getRarity(target);
 
-    // Find pulse band
     const band = PULSE_BANDS.find((b) => dist <= b.maxDist) || PULSE_BANDS[PULSE_BANDS.length - 1];
 
-    // Vibration pulses
+    // Vibration (skip if low battery)
     if (pulseTimerRef.current) clearInterval(pulseTimerRef.current);
-    pulseTimerRef.current = setInterval(() => {
-      if (navigator.vibrate) navigator.vibrate(band.pattern);
-    }, band.interval);
-
-    // Audio: frequency rises as you get closer (220Hz far → 880Hz close)
-    const closeness = Math.max(0, 1 - dist / 150);
-    const freq = 220 + closeness * 660; // 220-880Hz
-
-    // Volume: louder when closer (0.02 far → 0.15 close)
-    const vol = 0.02 + closeness * 0.13;
-
-    // Panning: left/right based on capsule bearing vs heading
-    let pan = 0;
-    if (userLat && userLng) {
-      const bearing = getBearing(userLat, userLng, nearest.lat, nearest.lng);
-      const heading = getHeading() || 0;
-      let relAngle = bearing - heading;
-      while (relAngle > 180) relAngle -= 360;
-      while (relAngle < -180) relAngle += 360;
-      // Map ±180° to ±1 panning
-      pan = Math.max(-1, Math.min(1, relAngle / 90));
+    if (!lowBattery) {
+      pulseTimerRef.current = setInterval(() => {
+        if (navigator.vibrate) navigator.vibrate(band.pattern);
+      }, band.interval);
     }
 
-    // Pitch modulation by rarity (higher pitch for rarer)
-    const rarityBonus = rarity.key === 'mythic' ? 200 : rarity.key === 'legendary' ? 100 : rarity.key === 'rare' ? 50 : 0;
+    // Closeness: 1 at 0m → 0 at 150m
+    const closeness = Math.max(0, 1 - Math.min(dist, 150) / 150);
+    const freq = 220 + closeness * 660;
+
+    // Volume baseline + rarity emphasis
+    let vol = 0.02 + closeness * 0.13;
+    if (isNight) vol *= 0.5;
+    if (lowBattery) vol *= 0.6;
+
+    // Spatial pan
+    let pan = 0;
+    if (userLat != null && userLng != null) {
+      const bearing = getBearing(userLat, userLng, target.lat, target.lng);
+      const heading = getHeading() || 0;
+      let rel = bearing - heading;
+      while (rel > 180) rel -= 360;
+      while (rel < -180) rel += 360;
+      pan = Math.max(-1, Math.min(1, rel / 90));
+    }
+
+    // Rarity pitch bonus
+    const rarityBonus = rarity.key === 'mythic' ? 200
+      : rarity.key === 'legendary' ? 100
+      : rarity.key === 'rare' ? 50 : 0;
 
     if (oscRef.current && gainRef.current && pannerRef.current) {
       const ctx = audioCtxRef.current;
@@ -142,49 +138,45 @@ export default function ProximitySonar({ capsules, userLat, userLng }) {
     }
 
     return () => {
-      if (pulseTimerRef.current) clearInterval(pulseTimerRef.current);
+      if (pulseTimerRef.current) { clearInterval(pulseTimerRef.current); pulseTimerRef.current = null; }
     };
-  }, [nearest?.id, nearest?.distance_meters, sonarActive, userLat, userLng, getHeading]);
+  }, [active, sonarActive, target?.id, distance, userLat, userLng, getHeading, lowBattery, isNight]);
 
-  // Cleanup
+  // ── Cleanup on unmount ──
   useEffect(() => {
     return () => {
       if (pulseTimerRef.current) clearInterval(pulseTimerRef.current);
-      if (oscRef.current) { try { oscRef.current.stop(); } catch {} }
-      if (audioCtxRef.current) { try { audioCtxRef.current.close(); } catch {} }
+      if (oscRef.current) { try { oscRef.current.stop(); } catch { /* already stopped */ } }
+      if (audioCtxRef.current) { try { audioCtxRef.current.close(); } catch { /* already closed */ } }
     };
   }, []);
 
-  // Visual sonar pulse indicator
-  if (!nearest) return null;
+  // ── Visual indicator (only when actively hunting) ──
+  if (!target) return null;
 
-  const dist = nearest.distance_meters;
-  const closeness = Math.max(0, 1 - dist / 150);
-  const rarity = getRarity(nearest);
+  const dist = distance ?? target.distance_meters ?? 0;
+  const closeness = Math.max(0, 1 - Math.min(dist, 150) / 150);
+  const rarity = getRarity(target);
   const color = rarity.key !== 'common' ? rarity.color : '#00f0ff';
-
-  // Pulse speed matches vibration interval
   const band = PULSE_BANDS.find((b) => dist <= b.maxDist) || PULSE_BANDS[PULSE_BANDS.length - 1];
   const pulseDur = band.interval / 1000;
 
   return (
     <div style={st.container}>
-      {/* Sonar ring */}
       <div style={{
         ...st.ring,
-        borderColor: `${color}${Math.round(20 + closeness * 40).toString(16).padStart(2, '0')}`,
-        animation: `sonarPing ${pulseDur}s ease-out infinite`,
+        borderColor: paused ? 'rgba(255,200,60,0.4)' : `${color}${Math.round(30 + closeness * 50).toString(16).padStart(2, '0')}`,
+        animation: paused ? 'none' : `sonarPing ${pulseDur}s ease-out infinite`,
       }} />
       <div style={{
         ...st.ring,
-        borderColor: `${color}${Math.round(10 + closeness * 20).toString(16).padStart(2, '0')}`,
-        animation: `sonarPing ${pulseDur}s ease-out infinite`,
+        borderColor: paused ? 'rgba(255,200,60,0.2)' : `${color}${Math.round(15 + closeness * 30).toString(16).padStart(2, '0')}`,
+        animation: paused ? 'none' : `sonarPing ${pulseDur}s ease-out infinite`,
         animationDelay: `${pulseDur * 0.4}s`,
       }} />
 
-      {/* Distance */}
       <div style={st.distWrap}>
-        <span style={{ ...st.dist, color }}>
+        <span style={{ ...st.dist, color: paused ? 'rgba(255,200,60,0.9)' : color }}>
           {dist < 1 ? '<1m' : dist < 100 ? `${dist.toFixed(0)}m` : `${(dist / 1000).toFixed(1)}km`}
         </span>
       </div>
@@ -219,7 +211,6 @@ const st = {
   },
 };
 
-// Sonar animation
 if (typeof document !== 'undefined' && !document.getElementById('xportl-sonar-kf')) {
   const style = document.createElement('style');
   style.id = 'xportl-sonar-kf';

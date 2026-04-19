@@ -85,7 +85,24 @@ export default function LockOnOverlay({ capsules, onSelect }) {
           setLockProgress(progress);
           if (progress >= 1 && !lockedCapsule) {
             setLockedCapsule(target);
-            if (navigator.vibrate) navigator.vibrate(30);
+            // Celebratory ascending haptic + quick chime via WebAudio
+            if (navigator.vibrate) navigator.vibrate([20, 30, 50, 30, 80]);
+            try {
+              const ctx = new (window.AudioContext || window.webkitAudioContext)();
+              [659.25, 880].forEach((f, i) => {
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.type = 'triangle';
+                osc.frequency.value = f;
+                const t0 = ctx.currentTime + i * 0.06;
+                gain.gain.setValueAtTime(0, t0);
+                gain.gain.linearRampToValueAtTime(0.1, t0 + 0.02);
+                gain.gain.exponentialRampToValueAtTime(0.001, t0 + 0.4);
+                osc.connect(gain); gain.connect(ctx.destination);
+                osc.start(t0); osc.stop(t0 + 0.45);
+              });
+              setTimeout(() => { try { ctx.close(); } catch { /* already closed */ } }, 600);
+            } catch { /* Web Audio unavailable */ }
           }
         }
       } else {
@@ -121,6 +138,15 @@ export default function LockOnOverlay({ capsules, onSelect }) {
 
   return (
     <div style={st.container}>
+      {/* Celebration burst on lock (plays once via CSS) */}
+      {lockedCapsule && (
+        <>
+          <div style={{ ...st.lockBurst, borderColor: color, boxShadow: `0 0 40px ${color}` }} />
+          <div style={{ ...st.lockBurst2, borderColor: `${color}aa` }} />
+          <div style={{ ...st.lockFlash, background: `radial-gradient(circle, ${color}44 0%, transparent 55%)` }} />
+        </>
+      )}
+
       {/* Lock-on reticle */}
       {showReticle && (
         <div style={{
@@ -128,6 +154,7 @@ export default function LockOnOverlay({ capsules, onSelect }) {
           opacity: 0.3 + lockProgress * 0.7,
           transform: `scale(${1.3 - lockProgress * 0.3})`,
           borderColor: lockedCapsule ? color : 'rgba(0,240,255,0.3)',
+          animation: lockedCapsule ? 'reticleLocked 0.6s ease-out' : 'none',
         }}>
           <div style={{ ...st.corner, top: -2, left: -2, borderTop: `2px solid ${color}`, borderLeft: `2px solid ${color}` }} />
           <div style={{ ...st.corner, top: -2, right: -2, borderTop: `2px solid ${color}`, borderRight: `2px solid ${color}` }} />
@@ -314,4 +341,50 @@ const st = {
     border: '1px solid rgba(255,255,255,0.06)',
     pointerEvents: 'none',
   },
+  lockBurst: {
+    position: 'absolute',
+    width: 120, height: 120, borderRadius: '50%',
+    border: '3px solid',
+    animation: 'lockBurst 0.9s cubic-bezier(.1,.6,.3,1) forwards',
+    pointerEvents: 'none',
+  },
+  lockBurst2: {
+    position: 'absolute',
+    width: 120, height: 120, borderRadius: '50%',
+    border: '2px solid',
+    animation: 'lockBurst2 1.2s cubic-bezier(.1,.6,.3,1) 0.1s forwards',
+    pointerEvents: 'none',
+  },
+  lockFlash: {
+    position: 'absolute',
+    width: 400, height: 400,
+    animation: 'lockFlash 0.5s ease-out',
+    pointerEvents: 'none',
+  },
 };
+
+if (typeof document !== 'undefined' && !document.getElementById('xportl-lockon-kf')) {
+  const style = document.createElement('style');
+  style.id = 'xportl-lockon-kf';
+  style.textContent = `
+    @keyframes reticleLocked {
+      0% { transform: scale(0.85); }
+      40% { transform: scale(1.15); }
+      100% { transform: scale(1); }
+    }
+    @keyframes lockBurst {
+      0% { width: 40px; height: 40px; opacity: 0.9; border-width: 4px; }
+      100% { width: 360px; height: 360px; opacity: 0; border-width: 0.5px; }
+    }
+    @keyframes lockBurst2 {
+      0% { width: 40px; height: 40px; opacity: 0.6; border-width: 3px; }
+      100% { width: 500px; height: 500px; opacity: 0; border-width: 0.5px; }
+    }
+    @keyframes lockFlash {
+      0% { opacity: 0; transform: scale(0.6); }
+      30% { opacity: 1; }
+      100% { opacity: 0; transform: scale(1.1); }
+    }
+  `;
+  document.head.appendChild(style);
+}

@@ -73,7 +73,7 @@ function createUserIcon(leaflet) {
   });
 }
 
-export default function MapView({ lat, lng, capsules, onSelectCapsule }) {
+export default function MapView({ lat, lng, capsules, onSelectCapsule, onStartHunt, currentUserId, activeHuntId }) {
   const mapContainerRef = useRef(null);
   const mapRef = useRef(null);
   const markersRef = useRef([]);
@@ -243,25 +243,45 @@ export default function MapView({ lat, lng, capsules, onSelectCapsule }) {
           ? `<span style="color:rgba(255,255,255,0.4);font-size:10px;">${cType.icon} ${cType.label}</span>`
           : '';
 
+        const isOwn = currentUserId && cap.created_by === currentUserId;
+        const isHunting = activeHuntId === cap.id;
+        const canHunt = !isOwn && !isHunting && onStartHunt;
+
+        const huntHtml = canHunt
+          ? `<button id="map-hunt-${cap.id}" style="
+              background:linear-gradient(135deg, #00f0ff, #00c8d8);color:#0a0814;
+              border:none;padding:6px 10px;border-radius:8px;font-weight:700;font-size:10px;
+              letter-spacing:0.03em;cursor:pointer;display:flex;align-items:center;gap:4px;
+              font-family:inherit;box-shadow:0 0 10px rgba(0,240,255,0.35);
+            ">🎯 Caçar</button>`
+          : isHunting
+          ? `<span style="color:#00f0ff;font-size:10px;font-weight:700;">● caçando</span>`
+          : isOwn
+          ? `<span style="color:rgba(255,255,255,0.3);font-size:10px;">sua</span>`
+          : '';
+
         const popupHtml = `
           <div style="
             background:rgba(14,11,24,0.95);color:#e8e8f0;padding:10px 14px;
             border-radius:12px;border:1px solid ${rarity.key !== 'common' ? rarity.color + '33' : 'rgba(0,240,255,0.12)'};
             backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
             font-family:-apple-system,sans-serif;font-size:12px;
-            min-width:150px;box-shadow:0 4px 24px rgba(0,0,0,0.6);
+            min-width:170px;box-shadow:0 4px 24px rgba(0,0,0,0.6);
           ">
-            <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
+            <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;flex-wrap:wrap;">
               ${rarityBadge}
               ${typeBadge}
               ${locked ? '<span style="color:#b44aff;font-size:10px;">🔒 Trancada</span>' : ''}
               ${ghost ? '<span style="color:#b44aff;font-size:10px;">👻 ~zona</span>' : ''}
             </div>
-            <div style="display:flex;justify-content:space-between;align-items:center;">
-              <span style="color:rgba(255,255,255,0.25);font-size:10px;">${dist}</span>
-              <span style="color:#00f0ff;font-size:10px;font-weight:600;cursor:pointer;" id="map-open-${cap.id}">
-                Explorar →
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px;">
+              <span style="color:rgba(255,255,255,0.35);font-size:10px;">${dist}</span>
+              <span style="color:rgba(0,240,255,0.7);font-size:10px;font-weight:600;cursor:pointer;" id="map-open-${cap.id}">
+                Detalhes →
               </span>
+            </div>
+            <div style="display:flex;justify-content:center;">
+              ${huntHtml}
             </div>
           </div>
         `;
@@ -270,6 +290,8 @@ export default function MapView({ lat, lng, capsules, onSelectCapsule }) {
         marker.on('popupopen', () => {
           const btn = document.getElementById(`map-open-${cap.id}`);
           if (btn) btn.onclick = () => { map.closePopup(); onSelectCapsule(cap); };
+          const huntBtn = document.getElementById(`map-hunt-${cap.id}`);
+          if (huntBtn) huntBtn.onclick = () => { map.closePopup(); onStartHunt?.(cap.id); };
         });
 
         marker.addTo(map);
@@ -277,7 +299,7 @@ export default function MapView({ lat, lng, capsules, onSelectCapsule }) {
       });
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visibleCapsules.length, filterRarity, filterType, lat, lng]);
+  }, [visibleCapsules.length, filterRarity, filterType, lat, lng, activeHuntId]);
 
   const activeFilters = (filterRarity !== 'all' ? 1 : 0) + (filterType !== 'all' ? 1 : 0);
 

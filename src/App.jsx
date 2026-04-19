@@ -23,7 +23,11 @@ import NotificationsPage from './components/NotificationsPage';
 import VisualMatcher from './components/VisualMatcher';
 import LockOnOverlay from './components/LockOnOverlay';
 import ProximitySonar from './components/ProximitySonar';
+import HuntHUD from './components/HuntHUD';
+import CapsuleFoundAnimation from './components/CapsuleFoundAnimation';
 import { getUnreadCount } from './services/notifications';
+import { markViewed } from './services/viewedCapsules';
+import { useHuntMode } from './hooks/useHuntMode';
 import { useGeolocation } from './hooks/useGeolocation';
 import { useCamera } from './hooks/useCamera';
 import { usePwaInstall } from './hooks/usePwaInstall';
@@ -118,6 +122,23 @@ export default function App() {
   const [showPortalAnimation, setShowPortalAnimation] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [scanVersion, setScanVersion] = useState(0);
+  const [foundAnimCapsule, setFoundAnimCapsule] = useState(null);
+
+  // ── Hunt Mode ──
+  const hunt = useHuntMode({
+    capsules: nearbyCapsules,
+    userLat: geo.lat,
+    userLng: geo.lng,
+    currentUserId: session?.user?.id,
+  });
+
+  // When user reaches target (≤3m), trigger the found animation once
+  useEffect(() => {
+    if (hunt.arrivedAt && !foundAnimCapsule) {
+      const cap = nearbyCapsules.find((c) => c.id === hunt.arrivedAt);
+      if (cap) setFoundAnimCapsule(cap);
+    }
+  }, [hunt.arrivedAt, nearbyCapsules, foundAnimCapsule]);
 
   // ── Auth listener ──
   useEffect(() => {
@@ -556,6 +577,10 @@ export default function App() {
   const handleCapsuleClick = useCallback((capsule) => {
     console.log('[XPortl] Capsule clicked:', capsule?.id, capsule?.content?.body);
     setSelectedCapsule({ ...capsule });
+    // Mark as viewed locally (hides from huntable list for 30 days)
+    if (capsule?.id) markViewed(capsule.id);
+    // If this capsule was the hunt target, close the hunt
+    if (hunt.targetId === capsule?.id) hunt.stopHunt('user');
     if (session?.user?.id) {
       logAccess({ userId: session.user.id, action: 'view_capsule', targetId: capsule.id, lat: geo.lat, lng: geo.lng });
       // Award XP for discovering (only if not own capsule)
@@ -563,7 +588,7 @@ export default function App() {
         awardXP(session.user.id, 'discover_capsule', capsule.id).then((r) => { if (r) setXpEvent(r); });
       }
     }
-  }, [session, geo.lat, geo.lng]);
+  }, [session, geo.lat, geo.lng, hunt]);
 
   const handleVortexClick = useCallback((vortexId) => {
     const { vortexes } = clusterCapsules(nearbyCapsules.filter((c) => c.content?.type !== 'ping'));
@@ -688,8 +713,29 @@ export default function App() {
             ) : null;
           })()}
 
-          {/* Sonar — vibration + spatial audio guide to nearest capsule */}
-          <ProximitySonar capsules={nearbyCapsules} userLat={geo.lat} userLng={geo.lng} />
+          {/* Sonar — activates ONLY during hunt mode; silent otherwise */}
+          <ProximitySonar
+            target={hunt.target}
+            distance={hunt.distanceToTarget}
+            userLat={geo.lat}
+            userLng={geo.lng}
+            paused={hunt.paused}
+            lowBattery={hunt.lowBattery}
+            isNight={hunt.isNight}
+          />
+
+          {/* Hunt HUD — top bar while hunting */}
+          <HuntHUD
+            target={hunt.target}
+            distance={hunt.distanceToTarget}
+            paused={hunt.paused}
+            pauseReason={hunt.pauseReason}
+            lowBattery={hunt.lowBattery}
+            isNight={hunt.isNight}
+            userLat={geo.lat}
+            userLng={geo.lng}
+            onStop={() => hunt.stopHunt('user')}
+          />
 
           <div style={styles.overlay}>
             <Radar lat={geo.lat} lng={geo.lng} accuracy={geo.accuracy} nearbyCount={nearbyCapsules.length} scanRadius={SCAN_RADIUS} />
@@ -714,7 +760,13 @@ export default function App() {
           lat={geo.lat}
           lng={geo.lng}
           capsules={nearbyCapsules}
+          currentUserId={session?.user?.id}
+          activeHuntId={hunt.targetId}
           onSelectCapsule={(cap) => { setSelectedCapsule(cap); }}
+          onStartHunt={(capsuleId) => {
+            hunt.startHunt(capsuleId);
+            setActiveTab('explore');
+          }}
         />
       )}
 
@@ -793,6 +845,23 @@ export default function App() {
       )}
 
       {/* CreatePost disabled — using LeaveTraceButton FAB instead */}
+
+      {/* Capsule found — cinematic reveal when arriving at hunt target */}
+      {foundAnimCapsule && (
+        <CapsuleFoundAnimation
+          capsule={foundAnimCapsule}
+          onClose={() => {
+            setFoundAnimCapsule(null);
+            hunt.clearArrived();
+          }}
+          onOpen={() => {
+            const cap = foundAnimCapsule;
+            setFoundAnimCapsule(null);
+            hunt.stopHunt('user');
+            handleCapsuleClick(cap);
+          }}
+        />
+      )}
 
       {/* XP notification toast */}
       <XPToast event={xpEvent} onDone={() => setXpEvent(null)} />
