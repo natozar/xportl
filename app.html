@@ -60,9 +60,9 @@
       html, body {
         margin: 0;
         padding: 0;
-        background: #0d0a1a;
-        color: #fff;
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background: #07040F;
+        color: #F4EFE6;
+        font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
         min-height: 100vh;
         overscroll-behavior: none;
       }
@@ -73,66 +73,105 @@
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        gap: 28px;
+        gap: 34px;
         background:
-          radial-gradient(circle at 50% 40%, rgba(0, 240, 255, 0.08), transparent 60%),
-          radial-gradient(circle at 50% 80%, rgba(180, 74, 255, 0.06), transparent 55%),
-          #0d0a1a;
+          radial-gradient(circle at 50% 38%, rgba(111, 247, 255, 0.10), transparent 55%),
+          radial-gradient(circle at 50% 82%, rgba(167, 123, 255, 0.08), transparent 60%),
+          #07040F;
         z-index: 9999;
-        transition: opacity 0.45s ease;
+        transition: opacity 0.5s cubic-bezier(0.22, 1, 0.36, 1);
       }
       #app-shell.hidden { opacity: 0; pointer-events: none; }
+
+      /* Hair-thin ring stack forming a portal */
       #app-shell .portal {
-        width: 120px;
-        height: 120px;
-        border-radius: 50%;
-        border: 1px solid rgba(0, 240, 255, 0.35);
-        box-shadow:
-          0 0 60px rgba(0, 240, 255, 0.25),
-          inset 0 0 40px rgba(0, 240, 255, 0.15);
         position: relative;
-        animation: shell-pulse 2.4s ease-in-out infinite;
+        width: 136px;
+        height: 136px;
+        border-radius: 50%;
+        border: 1px solid rgba(111, 247, 255, 0.35);
+        box-shadow:
+          0 0 80px rgba(111, 247, 255, 0.22),
+          inset 0 0 50px rgba(111, 247, 255, 0.12);
+        animation: shell-pulse 2.6s ease-in-out infinite;
       }
       #app-shell .portal::before,
       #app-shell .portal::after {
         content: '';
         position: absolute;
-        inset: 14px;
+        inset: 16px;
         border-radius: 50%;
-        border: 1px solid rgba(180, 74, 255, 0.3);
+        border: 1px solid rgba(167, 123, 255, 0.32);
       }
       #app-shell .portal::after {
-        inset: 34px;
-        border-color: rgba(0, 240, 255, 0.5);
+        inset: 38px;
+        border-color: rgba(111, 247, 255, 0.55);
+        box-shadow: 0 0 28px rgba(111, 247, 255, 0.35);
       }
+      /* Sweeping hairline */
+      #app-shell .portal .sweep {
+        position: absolute;
+        top: 50%; left: 50%;
+        width: 100%; height: 1px;
+        background: linear-gradient(to right, transparent, rgba(111, 247, 255, 0.9), transparent);
+        transform-origin: 0 50%;
+        animation: shell-sweep 3s linear infinite;
+        opacity: 0.8;
+      }
+
       #app-shell .brand {
-        font-size: 0.85rem;
-        letter-spacing: 0.5em;
-        color: #00f0ff;
-        text-shadow: 0 0 20px rgba(0, 240, 255, 0.4);
-        font-weight: 700;
+        font-family: "Fraunces", Georgia, serif;
+        font-size: 1.6rem;
+        letter-spacing: -0.015em;
+        color: #F4EFE6;
+        font-weight: 400;
+        font-style: italic;
       }
+      #app-shell .brand .d { color: #FF8A5C; font-style: normal; }
+
       #app-shell .tag {
-        font-size: 0.65rem;
-        letter-spacing: 0.2em;
-        color: rgba(255, 255, 255, 0.35);
+        font-family: ui-monospace, "JetBrains Mono", monospace;
+        font-size: 0.66rem;
+        letter-spacing: 0.28em;
+        color: rgba(244, 239, 230, 0.45);
         text-transform: uppercase;
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
       }
+      #app-shell .tag::before {
+        content: '';
+        width: 6px; height: 6px;
+        border-radius: 50%;
+        background: #9FE870;
+        box-shadow: 0 0 10px #9FE870;
+        animation: shell-blink 1.4s ease-in-out infinite;
+      }
+
       @keyframes shell-pulse {
-        0%, 100% { transform: scale(1); opacity: 0.85; }
-        50%      { transform: scale(1.06); opacity: 1; }
+        0%, 100% { transform: scale(1); opacity: 0.9; }
+        50%      { transform: scale(1.05); opacity: 1; }
+      }
+      @keyframes shell-sweep {
+        to { transform: rotate(360deg); }
+      }
+      @keyframes shell-blink {
+        0%, 100% { opacity: 1; }
+        50%      { opacity: 0.25; }
       }
       @media (prefers-reduced-motion: reduce) {
-        #app-shell .portal { animation: none; }
+        #app-shell .portal,
+        #app-shell .portal .sweep,
+        #app-shell .tag::before { animation: none; }
         #app-shell.hidden { transition: none; }
       }
     </style>
   </head>
   <body>
     <div id="app-shell" aria-hidden="true">
-      <div class="portal"></div>
-      <div class="brand">XPORTL</div>
-      <div class="tag">abrindo portal...</div>
+      <div class="portal"><span class="sweep"></span></div>
+      <div class="brand">xportl<span class="d">.</span></div>
+      <div class="tag">abrindo portal</div>
     </div>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
