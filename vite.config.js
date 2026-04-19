@@ -1,9 +1,22 @@
 import { defineConfig } from 'vite';
 import { resolve } from 'path';
+import { execSync } from 'child_process';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 
+// Best-effort: capture current git commit SHA at build time so GodMode's
+// auto-generated Claude prompts include the exact version that was running
+// when the error was captured. Falls back to 'dev' outside a git checkout.
+let COMMIT_SHA = 'dev';
+try {
+  COMMIT_SHA = execSync('git rev-parse --short HEAD', { encoding: 'utf8' }).trim();
+} catch { /* no git / shallow clone / non-git build */ }
+
 export default defineConfig({
+  define: {
+    __APP_COMMIT__: JSON.stringify(COMMIT_SHA),
+    __APP_REPO__: JSON.stringify('natozar/xportl'),
+  },
   plugins: [
     react(),
     VitePWA({
