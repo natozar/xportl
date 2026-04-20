@@ -72,11 +72,12 @@ export default function ARScene({ capsules, pings, onCapsuleClick, onVortexClick
 
     const scene = document.createElement('a-scene');
     scene.setAttribute('vr-mode-ui', 'enabled: false');
-    // Native pixel ratio (capped at 3 for perf) so the 3D overlay renders
-    // at the same sharpness as the camera feed beneath it. powerPreference
-    // 'high-performance' is the WebGL hint that asks Chrome/Safari for the
+    // Native pixel ratio — uncapped on flagships (S25 Ultra ≈3.5, iPhone
+    // 15 Pro ≈3.0) so the 3D overlay matches the panel's pixel density.
+    // Cap at 4 only as a safety net for absurd future devices.
+    // powerPreference 'high-performance' asks Chrome/Safari for the
     // discrete GPU on hybrid devices.
-    const dpr = Math.min(window.devicePixelRatio || 1, 3);
+    const dpr = Math.min(window.devicePixelRatio || 1, 4);
     scene.setAttribute(
       'renderer',
       `antialias: true; alpha: true; logarithmicDepthBuffer: true; ` +
@@ -130,6 +131,31 @@ export default function ARScene({ capsules, pings, onCapsuleClick, onVortexClick
 
     sceneContainerRef.current.appendChild(scene);
     sceneRef.current = scene;
+
+    // Telemetry: once the scene mounts, log the actual canvas + video
+    // dimensions so we can prove the AR layer is rendering at the device's
+    // native resolution. Helpful when users report "blurry AR".
+    scene.addEventListener('loaded', () => {
+      setTimeout(() => {
+        const canvas = scene.querySelector('canvas');
+        const video = scene.querySelector('video') || document.querySelector('#arjs-video');
+        const cw = canvas?.width;
+        const ch = canvas?.height;
+        const vw = video?.videoWidth;
+        const vh = video?.videoHeight;
+        // Force the canvas CSS to match its backing-store size so the
+        // browser doesn't bilinearly upscale a smaller drawingbuffer.
+        if (canvas) {
+          canvas.style.imageRendering = 'auto';
+          canvas.style.width = '100vw';
+          canvas.style.height = '100vh';
+        }
+        console.log(
+          `[XPortl AR] canvas=${cw}×${ch} video=${vw}×${vh} ` +
+          `dpr=${window.devicePixelRatio} viewport=${window.innerWidth}×${window.innerHeight}`
+        );
+      }, 1500);
+    }, { once: true });
 
     } // end initScene
 

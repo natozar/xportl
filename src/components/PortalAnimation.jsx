@@ -216,7 +216,13 @@ const s = {
     background: 'radial-gradient(ellipse at 40% 30%, rgba(180,74,255,0.08) 0%, transparent 50%), radial-gradient(ellipse at 60% 70%, rgba(0,240,255,0.06) 0%, transparent 50%)',
   },
   svg: {
-    position: 'absolute', width: '100vmin', height: '100vmin',
+    // 100vmax = larger viewport axis. On portrait phones this fills the
+    // height (instead of vmin which only fills the narrow side). overflow
+    // visible lets rings + glow extend beyond the SVG bounds without
+    // creating bands at the top/bottom.
+    position: 'absolute',
+    width: '100vmax', height: '100vmax',
+    overflow: 'visible',
   },
   particleContainer: {
     position: 'absolute', width: 0, height: 0,
@@ -234,7 +240,7 @@ const s = {
     background: 'radial-gradient(circle, rgba(0,240,255,0.8) 0%, rgba(180,74,255,0.2) 30%, transparent 60%)',
   },
   rift: {
-    position: 'absolute', width: '80vmin', height: '80vmin',
+    position: 'absolute', width: '80vmax', height: '80vmax',
     borderRadius: '50%',
   },
   riftEdge: {
