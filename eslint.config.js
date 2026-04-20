@@ -44,6 +44,7 @@ export default [
         atob: 'readonly',
         performance: 'readonly',
         caches: 'readonly',
+        MutationObserver: 'readonly',
         __APP_COMMIT__: 'readonly',
         __APP_REPO__: 'readonly',
       },

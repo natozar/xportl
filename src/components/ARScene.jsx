@@ -3,7 +3,12 @@ import { registerXPortlComponents } from '../aframe/registerComponents';
 import { isCapsuleLocked, getRarity } from '../services/capsules';
 import { isPing, PING_LIFETIME } from '../services/pings';
 import { clusterCapsules } from '../services/clustering';
-import { applyAdvancedTrackConstraints, pickBestBackCameraId } from '../services/cameraCapabilities';
+import {
+  applyAdvancedTrackConstraints,
+  pickBestBackCameraId,
+  acquireBestStream,
+  styleAsFullscreenVideo,
+} from '../services/cameraCapabilities';
 
 const DEV_LAT = -23.5505;
 const DEV_LNG = -46.6333;
@@ -135,40 +140,28 @@ export default function ARScene({ capsules, pings, onCapsuleClick, onVortexClick
     sceneContainerRef.current.appendChild(scene);
     sceneRef.current = scene;
 
-    // Telemetry + presentation polish: once the scene mounts, force the AR
-    // video element to fill the screen at its native resolution (object-fit
-    // cover handles aspect mismatch by cropping, never stretching) and the
-    // AR canvas to overlay it transparently at full screen size.
+    // Best-effort: style the AR video + canvas to fill the screen natively.
+    // Done in three places because AR.js's mount timing differs across
+    // versions: 'loaded' event, MutationObserver on the scene, and a final
+    // poll. Whichever fires first wins; the rest are idempotent no-ops.
+    const styleScene = () => {
+      const canvas = scene.querySelector('canvas');
+      const video = scene.querySelector('video') || document.querySelector('#arjs-video');
+      if (video) styleAsFullscreenVideo(video);
+      if (canvas) {
+        Object.assign(canvas.style, {
+          position: 'fixed',
+          top: '0', left: '0',
+          width: '100vw', height: '100vh',
+          background: 'transparent',
+        });
+      }
+      return { canvas, video };
+    };
+
     scene.addEventListener('loaded', () => {
       setTimeout(() => {
-        const canvas = scene.querySelector('canvas');
-        const video = scene.querySelector('video') || document.querySelector('#arjs-video');
-
-        if (video) {
-          // The browser displays this <video> natively — no WebGL upscale,
-          // no aspect-ratio stretching. Cover crops the wider axis instead
-          // of squishing pixels.
-          Object.assign(video.style, {
-            position: 'fixed',
-            top: '0', left: '0',
-            width: '100vw', height: '100vh',
-            objectFit: 'cover',
-            zIndex: '-1',
-            background: '#000',
-          });
-          video.setAttribute('playsinline', '');
-        }
-
-        if (canvas) {
-          // Canvas overlays the video transparently — only renders 3D objects.
-          Object.assign(canvas.style, {
-            position: 'fixed',
-            top: '0', left: '0',
-            width: '100vw', height: '100vh',
-            background: 'transparent',
-          });
-        }
-
+        const { canvas, video } = styleScene();
         console.log(
           `[XPortl AR] canvas=${canvas?.width}×${canvas?.height} ` +
           `video=${video?.videoWidth}×${video?.videoHeight} ` +
@@ -176,6 +169,28 @@ export default function ARScene({ capsules, pings, onCapsuleClick, onVortexClick
         );
       }, 1500);
     }, { once: true });
+
+    // Watch for AR.js mounting the video on its own schedule (older versions
+    // mount before 'loaded' fires; newer ones after). Fires styleScene the
+    // moment the <video> appears anywhere under the scene.
+    const observer = new MutationObserver(() => {
+      const v = scene.querySelector('video') || document.querySelector('#arjs-video');
+      if (v) {
+        styleScene();
+        // Once styled successfully, no need to keep observing.
+        if (v.videoWidth > 0) observer.disconnect();
+      }
+    });
+    observer.observe(scene, { childList: true, subtree: true });
+
+    // Re-apply styling on rotation and visibility-change — Android's
+    // back-from-background sometimes blanks the video element.
+    const reapply = () => styleScene();
+    window.addEventListener('orientationchange', reapply);
+    window.addEventListener('resize', reapply);
+    document.addEventListener('visibilitychange', reapply);
+    // Stash so the unmount cleanup can detach.
+    scene._xplStyleHandlers = { reapply, observer };
 
     } // end initScene
 
@@ -185,8 +200,16 @@ export default function ARScene({ capsules, pings, onCapsuleClick, onVortexClick
   // Ensure the scene DOM is torn down if the component actually unmounts.
   useEffect(() => {
     return () => {
-      if (sceneRef.current?.parentNode) {
-        sceneRef.current.parentNode.removeChild(sceneRef.current);
+      const scene = sceneRef.current;
+      if (scene?._xplStyleHandlers) {
+        const { reapply, observer } = scene._xplStyleHandlers;
+        window.removeEventListener('orientationchange', reapply);
+        window.removeEventListener('resize', reapply);
+        document.removeEventListener('visibilitychange', reapply);
+        observer?.disconnect();
+      }
+      if (scene?.parentNode) {
+        scene.parentNode.removeChild(scene);
       }
       initializedRef.current = false;
     };
@@ -217,56 +240,48 @@ export default function ARScene({ capsules, pings, onCapsuleClick, onVortexClick
         return;
       }
 
-      // First pass: try to swap to the main wide back lens at MAX resolution.
+      // First pass: swap to the best lens at the best tier the device can
+      // actually negotiate. acquireBestStream walks 4K → 1440p → 1080p →
+      // 720p → 480p so a flagship gets pristine and a low-end Android still
+      // gets *something* without OverconstrainedError.
       if (!upgraded) {
         upgraded = true;
         try {
-          const lensId = await pickBestBackCameraId();
+          const lensId = await pickBestBackCameraId().catch(() => null);
           const currentDeviceId = currentTrack.getSettings?.()?.deviceId;
-          if (lensId && lensId !== currentDeviceId) {
-            // Negotiate the highest the sensor exposes. S25 Ultra / iPhone 15 Pro
-            // can deliver 4K@60. 'ideal' lets the browser walk down to whatever
-            // the device actually supports without throwing OverconstrainedError.
-            // resizeMode 'none' tells Chrome not to letterbox/crop in software.
-            // No aspectRatio constraint — sensors are 4:3 / 16:9 native, so
-            // forcing portrait aspect (2.16) made the browser do weird things.
-            // We let the camera output its native landscape frame and CSS the
-            // <video> with object-fit: cover to fill the screen.
-            const better = await navigator.mediaDevices.getUserMedia({
-              video: {
-                deviceId: { exact: lensId },
-                width:  { ideal: 3840 },
-                height: { ideal: 2160 },
-                frameRate: { ideal: 60, max: 60 },
-                resizeMode: 'none',
-              },
-              audio: false,
+          // Skip the swap if AR.js already opened the right lens AND a
+          // reasonable resolution (avoid wasted gUM call + flicker).
+          const currentSet = currentTrack.getSettings?.() || {};
+          const alreadyGood = lensId && lensId === currentDeviceId && (currentSet.width || 0) >= 1280;
+          if (!alreadyGood) {
+            const { stream: better, settings, tier } = await acquireBestStream({
+              facingMode: 'environment',
+              preferLensId: lensId,
             });
             if (cancelled) {
               better.getTracks().forEach((t) => t.stop());
               return;
             }
-            // Swap the video element's stream. AR.js reads frames via the
-            // <video> element each tick — it doesn't care which stream is
-            // backing it. Stop the old one first so the device unlocks.
+            // Swap the <video>'s stream. AR.js reads frames via the element
+            // each tick — it doesn't care which MediaStream is backing it.
+            // Stop the old one first so the device unlocks cleanly.
             stream.getTracks().forEach((t) => t.stop());
             v.srcObject = better;
-            try { await v.play(); } catch { /* iOS allow */ }
+            // Re-apply iOS-safe attributes; AR.js sometimes clears them.
+            styleAsFullscreenVideo(v);
+            try { await v.play(); } catch { /* iOS gesture quirk */ }
             const newTrack = better.getVideoTracks()[0];
             if (newTrack) applyAdvancedTrackConstraints(newTrack).catch(() => {});
-            // Log what we actually negotiated — flagship phones may grant 4K,
-            // mid-range may cap at 1080p, etc. Crucial for debugging "blurry AR".
-            const set = newTrack?.getSettings?.() || {};
             console.log(
-              `[XPortl AR] Upgraded → ${set.width}×${set.height} @${set.frameRate}fps ` +
-              `lens=${(newTrack?.label || 'unknown').slice(0, 60)}`
+              `[XPortl AR] Upgraded → ${settings.width}×${settings.height} @${settings.frameRate}fps ` +
+              `tier=${tier.label} lens=${(newTrack?.label || 'unknown').slice(0, 60)}`
             );
             return;
           }
         } catch (err) {
-          // Lens swap failed — keep AR.js's original stream and just push
-          // continuous AF onto it.
-          console.debug('[XPortl AR] Lens upgrade skipped:', err?.name || err);
+          // Lens upgrade failed entirely — keep AR.js's original stream and
+          // just push continuous AF onto it. App stays functional.
+          console.debug('[XPortl AR] Lens upgrade skipped:', err?.name || err, err?.attempts || '');
         }
       }
 

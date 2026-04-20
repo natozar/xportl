@@ -175,3 +175,112 @@ export function inspectDevice() {
     mobile: n.userAgentData?.mobile ?? null,
   };
 }
+
+/**
+ * Resolution tiers, ordered from best to worst. acquireBestStream() walks
+ * this list, so a flagship gets 4K and a low-end Android falls through to
+ * 720p without throwing OverconstrainedError.
+ */
+const RES_TIERS = [
+  { width: 3840, height: 2160, label: '4K UHD' },
+  { width: 2560, height: 1440, label: '1440p' },
+  { width: 1920, height: 1080, label: '1080p' },
+  { width: 1280, height: 720,  label: '720p'  },
+  { width: 640,  height: 480,  label: '480p'  },
+];
+
+/**
+ * Pick the starting tier based on device capabilities. Saves a couple of
+ * failed getUserMedia attempts on phones we already know can't do 4K.
+ *  - <=2 GB RAM or <=4 cores → start at 1080p
+ *  - Save-data mode → start at 720p
+ *  - everything else → 4K
+ */
+function startTierIndex() {
+  const d = inspectDevice();
+  if (d.connection?.saveData) return 3;     // 720p
+  if ((d.memoryGB && d.memoryGB <= 2) || (d.cores && d.cores <= 4)) return 2; // 1080p
+  return 0; // 4K
+}
+
+/**
+ * Get the best stream the device can deliver, walking the tier list
+ * until one negotiates. Always tries with the pinned best lens first;
+ * if that fails (OverconstrainedError on a fragile driver), falls back
+ * to facingMode.
+ *
+ * Returns { stream, settings, tier } or throws on full failure.
+ */
+export async function acquireBestStream({ facingMode = 'environment', preferLensId = null } = {}) {
+  if (!navigator.mediaDevices?.getUserMedia) {
+    throw new Error('getUserMedia not supported');
+  }
+
+  const lensId = preferLensId ?? (facingMode === 'environment' ? await pickBestBackCameraId().catch(() => null) : null);
+  const start = startTierIndex();
+
+  const attempts = [];
+  for (let i = start; i < RES_TIERS.length; i++) {
+    const t = RES_TIERS[i];
+    // Try with pinned lens first, then with facingMode as a fallback at
+    // the same tier before stepping down. This handles Android drivers
+    // that accept facingMode but reject deviceId pins on some lenses.
+    const variants = lensId
+      ? [
+          { deviceId: { exact: lensId }, width: { ideal: t.width }, height: { ideal: t.height }, frameRate: { ideal: 30, max: 60 }, resizeMode: 'none' },
+          { facingMode, width: { ideal: t.width }, height: { ideal: t.height }, frameRate: { ideal: 30, max: 60 } },
+        ]
+      : [
+          { facingMode, width: { ideal: t.width }, height: { ideal: t.height }, frameRate: { ideal: 30, max: 60 } },
+        ];
+
+    for (const video of variants) {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video, audio: false });
+        const settings = stream.getVideoTracks()[0]?.getSettings?.() || {};
+        return { stream, settings, tier: t };
+      } catch (err) {
+        attempts.push({ tier: t.label, name: err?.name, msg: err?.message });
+      }
+    }
+  }
+
+  // Last-ditch: minimum constraints, any camera.
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode }, audio: false });
+    const settings = stream.getVideoTracks()[0]?.getSettings?.() || {};
+    return { stream, settings, tier: { label: 'minimum', width: settings.width, height: settings.height } };
+  } catch (err) {
+    attempts.push({ tier: 'minimum', name: err?.name, msg: err?.message });
+    const e = new Error('All camera tiers failed');
+    e.attempts = attempts;
+    throw e;
+  }
+}
+
+/**
+ * Apply the bulletproof, cross-browser style for a video element that
+ * should fill the entire viewport at native resolution without stretching.
+ * iOS Safari refuses autoplay without muted+playsinline, so we force them.
+ * Idempotent — safe to call multiple times (rotation, visibility change).
+ */
+export function styleAsFullscreenVideo(video) {
+  if (!video) return;
+  Object.assign(video.style, {
+    position: 'fixed',
+    top: '0',
+    left: '0',
+    width: '100vw',
+    height: '100vh',
+    objectFit: 'cover',
+    objectPosition: 'center',
+    zIndex: '-1',
+    background: '#000',
+  });
+  // iOS Safari needs all three or it silently refuses to play inline.
+  video.setAttribute('playsinline', '');
+  video.setAttribute('webkit-playsinline', '');
+  video.setAttribute('autoplay', '');
+  video.muted = true;
+  video.defaultMuted = true;
+}
