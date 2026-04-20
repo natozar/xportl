@@ -72,17 +72,30 @@ export default function ARScene({ capsules, pings, onCapsuleClick, onVortexClick
 
     const scene = document.createElement('a-scene');
     scene.setAttribute('vr-mode-ui', 'enabled: false');
-    // Use native pixel ratio (capped at 3 for perf) so the 3D overlay
-    // renders at the same sharpness as the camera feed beneath it.
+    // Native pixel ratio (capped at 3 for perf) so the 3D overlay renders
+    // at the same sharpness as the camera feed beneath it. powerPreference
+    // 'high-performance' is the WebGL hint that asks Chrome/Safari for the
+    // discrete GPU on hybrid devices.
     const dpr = Math.min(window.devicePixelRatio || 1, 3);
-    scene.setAttribute('renderer', `antialias: true; alpha: true; logarithmicDepthBuffer: true; pixelRatio: ${dpr}; precision: highp`);
-    // Request the max resolution the device sensor supports.
-    // AR.js will pass sourceWidth/Height to getUserMedia as {ideal}.
-    // Portrait phones: swap so the long axis matches the screen.
+    scene.setAttribute(
+      'renderer',
+      `antialias: true; alpha: true; logarithmicDepthBuffer: true; ` +
+      `pixelRatio: ${dpr}; precision: highp; powerPreference: high-performance; ` +
+      `physicallyCorrectLights: true; colorManagement: true`
+    );
+    // Request the highest resolution the sensor will hand us. AR.js passes
+    // sourceWidth/Height to getUserMedia as {ideal}, so on flagship phones
+    // (S25 Ultra, iPhone 15 Pro) we get true 4K input. Portrait phones swap
+    // so the long axis matches the screen. The post-mount upgrade effect
+    // below then re-opens the stream pinned to the main wide lens at 4K.
     const portrait = window.innerHeight > window.innerWidth;
-    const sw = portrait ? 1920 : 3840;
-    const sh = portrait ? 3840 : 1920;
-    scene.setAttribute('arjs', `sourceType: webcam; debugUIEnabled: false; videoTexture: true; sourceWidth: ${sw}; sourceHeight: ${sh}; displayWidth: ${window.innerWidth * dpr}; displayHeight: ${window.innerHeight * dpr}`);
+    const sw = portrait ? 2160 : 3840;
+    const sh = portrait ? 3840 : 2160;
+    scene.setAttribute('arjs',
+      `sourceType: webcam; debugUIEnabled: false; videoTexture: true; ` +
+      `sourceWidth: ${sw}; sourceHeight: ${sh}; ` +
+      `displayWidth: ${window.innerWidth * dpr}; displayHeight: ${window.innerHeight * dpr}`
+    );
 
     const camera = document.createElement('a-camera');
     camera.setAttribute('gps-camera', buildGpsCameraAttr());
@@ -158,19 +171,25 @@ export default function ARScene({ capsules, pings, onCapsuleClick, onVortexClick
         return;
       }
 
-      // First pass: try to swap to the main wide back lens.
+      // First pass: try to swap to the main wide back lens at MAX resolution.
       if (!upgraded) {
         upgraded = true;
         try {
           const lensId = await pickBestBackCameraId();
           const currentDeviceId = currentTrack.getSettings?.()?.deviceId;
           if (lensId && lensId !== currentDeviceId) {
+            // Negotiate the highest the sensor exposes. S25 Ultra / iPhone 15 Pro
+            // can deliver 4K@60. 'ideal' lets the browser walk down to whatever
+            // the device actually supports without throwing OverconstrainedError.
+            // resizeMode: 'none' tells Chrome not to letterbox/crop in software.
             const better = await navigator.mediaDevices.getUserMedia({
               video: {
                 deviceId: { exact: lensId },
-                width:  { ideal: 1920 },
-                height: { ideal: 1080 },
+                width:  { ideal: 3840 },
+                height: { ideal: 2160 },
                 frameRate: { ideal: 60, max: 60 },
+                resizeMode: 'none',
+                aspectRatio: { ideal: window.innerHeight / window.innerWidth },
               },
               audio: false,
             });
@@ -186,7 +205,13 @@ export default function ARScene({ capsules, pings, onCapsuleClick, onVortexClick
             try { await v.play(); } catch { /* iOS allow */ }
             const newTrack = better.getVideoTracks()[0];
             if (newTrack) applyAdvancedTrackConstraints(newTrack).catch(() => {});
-            console.log('[XPortl AR] Upgraded camera to main wide lens');
+            // Log what we actually negotiated — flagship phones may grant 4K,
+            // mid-range may cap at 1080p, etc. Crucial for debugging "blurry AR".
+            const set = newTrack?.getSettings?.() || {};
+            console.log(
+              `[XPortl AR] Upgraded → ${set.width}×${set.height} @${set.frameRate}fps ` +
+              `lens=${(newTrack?.label || 'unknown').slice(0, 60)}`
+            );
             return;
           }
         } catch (err) {
