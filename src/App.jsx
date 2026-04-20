@@ -331,17 +331,26 @@ export default function App() {
     const scan = async () => {
       // Capsules are GPS-anchored — never preload without real coords, otherwise
       // distance_meters defaults to 0 and any capsule in the DB appears "at home".
-      if (geo.lat === null || geo.lng === null) return;
+      if (geo.lat === null || geo.lng === null) {
+        console.warn('[XPortl Scan] Skipping — GPS not yet resolved (lat/lng null)');
+        return;
+      }
       try {
+        console.log(`[XPortl Scan] Querying around ${geo.lat.toFixed(5)},${geo.lng.toFixed(5)} ±${(geo.accuracy || 0).toFixed(0)}m radius=${SCAN_RADIUS}m`);
         const results = await getNearbyCapsules(geo.lat, geo.lng, SCAN_RADIUS);
         if (cancelled) return;
-        setNearbyCapsules(results.filter(isCapsuleVisible));
+        const visible = results.filter(isCapsuleVisible);
+        setNearbyCapsules(visible);
         setLastScan(new Date().toLocaleTimeString('pt-BR'));
         setSupabaseOk(true);
-        console.log(`[XPortl] Scan: ${results.length} capsules within ${SCAN_RADIUS}m`);
+        console.log(`[XPortl Scan] ${results.length} capsules raw → ${visible.length} visible (filtered by moderation_status)`);
+        if (results.length > 0 && visible.length === 0) {
+          console.warn('[XPortl Scan] All capsules filtered out by moderation_status — sample statuses:',
+            results.slice(0, 5).map((c) => ({ id: c.id?.slice(0, 8), status: c.moderation_status })));
+        }
       } catch (err) {
         if (cancelled) return;
-        console.error('[XPortl] Scan failed:', err);
+        console.error('[XPortl Scan] FAILED:', err?.message || err, err);
         setSupabaseOk(false);
       }
     };
@@ -349,7 +358,7 @@ export default function App() {
     scan();
     const interval = setInterval(scan, SCAN_INTERVAL);
     return () => { cancelled = true; clearInterval(interval); };
-  }, [ready, geo.lat, geo.lng, scanVersion]);
+  }, [ready, geo.lat, geo.lng, geo.accuracy, scanVersion]);
 
   // ── Shared capsule link detection ──
   useEffect(() => {
