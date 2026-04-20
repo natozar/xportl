@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { isCapsuleLocked } from '../services/capsules';
 
 /**
  * NearbyOverlay — passive ambient indicator only.
@@ -14,7 +15,8 @@ export default function NearbyOverlay({ capsules }) {
   const { total, dense } = useMemo(() => {
     const real = (capsules || []).filter(
       (c) => c.content?.type !== 'ping' &&
-             c.distance_meters !== undefined && c.distance_meters <= 500
+             c.distance_meters !== undefined && c.distance_meters <= 500 &&
+             !isCapsuleLocked(c)
     );
     const close = real.filter((c) => c.distance_meters <= 50);
     return { total: real.length, dense: close.length >= 3 };

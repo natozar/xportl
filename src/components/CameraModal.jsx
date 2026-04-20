@@ -306,6 +306,17 @@ export default function CameraModal({ onClose, onCapture, initialMode = 'photo' 
   // cleanup on unmount
   useEffect(() => {
     return () => {
+      // Stop any in-flight recording first — otherwise MediaRecorder keeps
+      // running in the background after the modal closes, holding the
+      // stream, draining battery, and leaking memory.
+      if (recorderRef.current) {
+        try {
+          if (recorderRef.current.state === 'recording') {
+            recorderRef.current.stop();
+          }
+        } catch { /* recorder already torn down — noop */ }
+        recorderRef.current = null;
+      }
       if (streamRef.current) {
         streamRef.current.getTracks().forEach((t) => t.stop());
         streamRef.current = null;
