@@ -86,15 +86,18 @@ export default function ARScene({ capsules, pings, onCapsuleClick, onVortexClick
     );
     // Request the highest resolution the sensor will hand us. AR.js passes
     // sourceWidth/Height to getUserMedia as {ideal}, so on flagship phones
-    // (S25 Ultra, iPhone 15 Pro) we get true 4K input. Portrait phones swap
-    // so the long axis matches the screen. The post-mount upgrade effect
-    // below then re-opens the stream pinned to the main wide lens at 4K.
-    const portrait = window.innerHeight > window.innerWidth;
-    const sw = portrait ? 2160 : 3840;
-    const sh = portrait ? 3840 : 2160;
+    // (S25 Ultra, iPhone 15 Pro) we get true 4K input.
+    //
+    // videoTexture: false → the camera <video> element stays in the DOM
+    // *behind* the AR canvas and is displayed natively by the browser.
+    // We then CSS it with object-fit: cover so it fills the screen at the
+    // device's full pixel density without WebGL upscale artifacts. The AR
+    // canvas above stays transparent and only renders the 3D objects.
+    // (videoTexture: true was causing aspect-ratio stretching because the
+    // landscape 16:9 video texture was being drawn on a portrait canvas.)
     scene.setAttribute('arjs',
-      `sourceType: webcam; debugUIEnabled: false; videoTexture: true; ` +
-      `sourceWidth: ${sw}; sourceHeight: ${sh}; ` +
+      `sourceType: webcam; debugUIEnabled: false; videoTexture: false; ` +
+      `sourceWidth: 3840; sourceHeight: 2160; ` +
       `displayWidth: ${window.innerWidth * dpr}; displayHeight: ${window.innerHeight * dpr}`
     );
 
@@ -132,26 +135,43 @@ export default function ARScene({ capsules, pings, onCapsuleClick, onVortexClick
     sceneContainerRef.current.appendChild(scene);
     sceneRef.current = scene;
 
-    // Telemetry: once the scene mounts, log the actual canvas + video
-    // dimensions so we can prove the AR layer is rendering at the device's
-    // native resolution. Helpful when users report "blurry AR".
+    // Telemetry + presentation polish: once the scene mounts, force the AR
+    // video element to fill the screen at its native resolution (object-fit
+    // cover handles aspect mismatch by cropping, never stretching) and the
+    // AR canvas to overlay it transparently at full screen size.
     scene.addEventListener('loaded', () => {
       setTimeout(() => {
         const canvas = scene.querySelector('canvas');
         const video = scene.querySelector('video') || document.querySelector('#arjs-video');
-        const cw = canvas?.width;
-        const ch = canvas?.height;
-        const vw = video?.videoWidth;
-        const vh = video?.videoHeight;
-        // Force the canvas CSS to match its backing-store size so the
-        // browser doesn't bilinearly upscale a smaller drawingbuffer.
-        if (canvas) {
-          canvas.style.imageRendering = 'auto';
-          canvas.style.width = '100vw';
-          canvas.style.height = '100vh';
+
+        if (video) {
+          // The browser displays this <video> natively — no WebGL upscale,
+          // no aspect-ratio stretching. Cover crops the wider axis instead
+          // of squishing pixels.
+          Object.assign(video.style, {
+            position: 'fixed',
+            top: '0', left: '0',
+            width: '100vw', height: '100vh',
+            objectFit: 'cover',
+            zIndex: '-1',
+            background: '#000',
+          });
+          video.setAttribute('playsinline', '');
         }
+
+        if (canvas) {
+          // Canvas overlays the video transparently — only renders 3D objects.
+          Object.assign(canvas.style, {
+            position: 'fixed',
+            top: '0', left: '0',
+            width: '100vw', height: '100vh',
+            background: 'transparent',
+          });
+        }
+
         console.log(
-          `[XPortl AR] canvas=${cw}×${ch} video=${vw}×${vh} ` +
+          `[XPortl AR] canvas=${canvas?.width}×${canvas?.height} ` +
+          `video=${video?.videoWidth}×${video?.videoHeight} ` +
           `dpr=${window.devicePixelRatio} viewport=${window.innerWidth}×${window.innerHeight}`
         );
       }, 1500);
@@ -207,7 +227,11 @@ export default function ARScene({ capsules, pings, onCapsuleClick, onVortexClick
             // Negotiate the highest the sensor exposes. S25 Ultra / iPhone 15 Pro
             // can deliver 4K@60. 'ideal' lets the browser walk down to whatever
             // the device actually supports without throwing OverconstrainedError.
-            // resizeMode: 'none' tells Chrome not to letterbox/crop in software.
+            // resizeMode 'none' tells Chrome not to letterbox/crop in software.
+            // No aspectRatio constraint — sensors are 4:3 / 16:9 native, so
+            // forcing portrait aspect (2.16) made the browser do weird things.
+            // We let the camera output its native landscape frame and CSS the
+            // <video> with object-fit: cover to fill the screen.
             const better = await navigator.mediaDevices.getUserMedia({
               video: {
                 deviceId: { exact: lensId },
@@ -215,7 +239,6 @@ export default function ARScene({ capsules, pings, onCapsuleClick, onVortexClick
                 height: { ideal: 2160 },
                 frameRate: { ideal: 60, max: 60 },
                 resizeMode: 'none',
-                aspectRatio: { ideal: window.innerHeight / window.innerWidth },
               },
               audio: false,
             });
