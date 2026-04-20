@@ -3,7 +3,7 @@ import { registerXPortlComponents } from '../aframe/registerComponents';
 import { isCapsuleLocked, getRarity } from '../services/capsules';
 import { isPing, PING_LIFETIME } from '../services/pings';
 import { clusterCapsules } from '../services/clustering';
-import { applyAdvancedTrackConstraints } from '../services/cameraCapabilities';
+import { applyAdvancedTrackConstraints, pickBestBackCameraId } from '../services/cameraCapabilities';
 
 const DEV_LAT = -23.5505;
 const DEV_LNG = -46.6333;
@@ -133,26 +133,73 @@ export default function ARScene({ capsules, pings, onCapsuleClick, onVortexClick
     };
   }, []);
 
-  // ── Push continuous autofocus / auto-exposure / auto-white-balance onto
-  // AR.js's camera track. AR.js calls getUserMedia internally with no
-  // advanced constraints, so the lens stays locked at whatever the driver
-  // boots with. Polling for the <video> is necessary because AR.js mounts
-  // it asynchronously after the scene 'loaded' event. Bails after 6s.
+  // ── Upgrade AR.js's camera stream:
+  // 1. Try to pin the MAIN wide back lens (AR.js defaults to facingMode
+  //    only, which on multi-lens phones picks whatever the driver feels
+  //    like — often telephoto/macro with terrible FOV).
+  // 2. Push continuous AF + AE + AWB onto the active track.
+  //
+  // Polling for the <video> is necessary because AR.js mounts it
+  // asynchronously after the scene 'loaded' event. Bails after 6s.
   useEffect(() => {
     let cancelled = false;
     let attempts = 0;
-    const tryApply = () => {
+    let upgraded = false;
+
+    const tryApply = async () => {
       if (cancelled) return;
       const v = document.querySelector('a-scene video, #arjs-video, video[autoplay][playsinline]');
       const stream = v?.srcObject;
-      const track = stream?.getVideoTracks?.()[0];
-      if (track) {
-        applyAdvancedTrackConstraints(track).catch(() => {});
+      const currentTrack = stream?.getVideoTracks?.()[0];
+
+      if (!currentTrack) {
+        attempts += 1;
+        if (attempts < 60) setTimeout(tryApply, 100);
         return;
       }
-      attempts += 1;
-      if (attempts < 60) setTimeout(tryApply, 100);
+
+      // First pass: try to swap to the main wide back lens.
+      if (!upgraded) {
+        upgraded = true;
+        try {
+          const lensId = await pickBestBackCameraId();
+          const currentDeviceId = currentTrack.getSettings?.()?.deviceId;
+          if (lensId && lensId !== currentDeviceId) {
+            const better = await navigator.mediaDevices.getUserMedia({
+              video: {
+                deviceId: { exact: lensId },
+                width:  { ideal: 1920 },
+                height: { ideal: 1080 },
+                frameRate: { ideal: 60, max: 60 },
+              },
+              audio: false,
+            });
+            if (cancelled) {
+              better.getTracks().forEach((t) => t.stop());
+              return;
+            }
+            // Swap the video element's stream. AR.js reads frames via the
+            // <video> element each tick — it doesn't care which stream is
+            // backing it. Stop the old one first so the device unlocks.
+            stream.getTracks().forEach((t) => t.stop());
+            v.srcObject = better;
+            try { await v.play(); } catch { /* iOS allow */ }
+            const newTrack = better.getVideoTracks()[0];
+            if (newTrack) applyAdvancedTrackConstraints(newTrack).catch(() => {});
+            console.log('[XPortl AR] Upgraded camera to main wide lens');
+            return;
+          }
+        } catch (err) {
+          // Lens swap failed — keep AR.js's original stream and just push
+          // continuous AF onto it.
+          console.debug('[XPortl AR] Lens upgrade skipped:', err?.name || err);
+        }
+      }
+
+      // Fallback path: just enable continuous AF on the existing stream.
+      applyAdvancedTrackConstraints(currentTrack).catch(() => {});
     };
+
     tryApply();
     return () => { cancelled = true; };
   }, []);

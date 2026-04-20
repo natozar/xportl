@@ -1,8 +1,11 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 
-// Reject positions with accuracy worse than this (meters).
-// In dense urban / indoor, accuracy can be 100-500m — unusable for AR.
-const MAX_ACCURACY = 100;
+// Accuracy threshold below which a fix is considered "trustworthy" for AR.
+// Above this we still USE the fix (NOT having coords is much worse than
+// having imprecise ones — capsule discovery breaks entirely), but flag it
+// as low-accuracy so UIs can warn the user. Indoor GPS routinely sits at
+// 50-200m, so rejecting >100m fixes meant never resolving at home.
+const HIGH_ACCURACY_THRESHOLD = 100;
 
 // Smooth GPS jitter with exponential moving average
 function smoothCoord(prev, next, alpha = 0.3) {
@@ -19,6 +22,7 @@ export function useGeolocation() {
     lng: null,
     altitude: null,
     accuracy: null,
+    lowAccuracy: false,
     error: null,
     watchId: null,
   });
@@ -41,18 +45,12 @@ export function useGeolocation() {
         (pos) => {
           const { latitude, longitude, altitude, accuracy } = pos.coords;
 
-          // Reject wildly inaccurate positions (urban canyon / indoor)
-          if (accuracy > MAX_ACCURACY) {
-            console.warn(`[XPortl GPS] Rejected position: accuracy ${accuracy.toFixed(0)}m > ${MAX_ACCURACY}m`);
-            // Still resolve first promise so app doesn't hang
-            if (resolveRef.current) {
-              resolveRef.current(pos);
-              resolveRef.current = null;
-            }
-            return;
+          // Smooth coordinates to reduce jitter (high-accuracy fixes get more
+          // smoothing weight; low-accuracy fixes are accepted but logged).
+          const isLowAcc = accuracy > HIGH_ACCURACY_THRESHOLD;
+          if (isLowAcc) {
+            console.warn(`[XPortl GPS] Low-accuracy fix accepted: ±${accuracy.toFixed(0)}m`);
           }
-
-          // Smooth coordinates to reduce jitter
           const smoothLat = smoothCoord(lastGoodRef.current.lat, latitude);
           const smoothLng = smoothCoord(lastGoodRef.current.lng, longitude);
           lastGoodRef.current = { lat: smoothLat, lng: smoothLng };
@@ -65,6 +63,7 @@ export function useGeolocation() {
             lng: smoothLng,
             altitude,
             accuracy,
+            lowAccuracy: isLowAcc,
             error: null,
             watchId,
           });
