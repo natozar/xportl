@@ -25,6 +25,7 @@ import LockOnOverlay from './components/LockOnOverlay';
 import ProximitySonar from './components/ProximitySonar';
 import HuntHUD from './components/HuntHUD';
 import CapsuleFoundAnimation from './components/CapsuleFoundAnimation';
+import CapsuleLaunchAnimation from './components/CapsuleLaunchAnimation';
 import { getUnreadCount } from './services/notifications';
 import { markViewed } from './services/viewedCapsules';
 import { useHuntMode } from './hooks/useHuntMode';
@@ -123,6 +124,7 @@ export default function App() {
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [scanVersion, setScanVersion] = useState(0);
   const [foundAnimCapsule, setFoundAnimCapsule] = useState(null);
+  const [launchEvent, setLaunchEvent] = useState(null);
 
   // ── Hunt Mode ──
   const hunt = useHuntMode({
@@ -510,6 +512,15 @@ export default function App() {
         hint_photo_url: hintPhotoUrl,
       });
 
+      // Trigger "O PORTAL SE ANCORA" 2.8s cinematic — fires on successful INSERT only.
+      setLaunchEvent({
+        lat: plant.lat,
+        lng: plant.lng,
+        rarity: rarity || 'common',
+        mediaType: mediaTypeField,
+        hasUnlockDate: !!unlockDate,
+      });
+
       // Log access (Marco Civil Art. 15) — fire-and-forget
       logAccess({ userId: session.user.id, action: 'create_capsule', lat: geo.lat, lng: geo.lng }).catch(() => {});
 
@@ -871,6 +882,29 @@ export default function App() {
             setFoundAnimCapsule(null);
             hunt.stopHunt('user');
             handleCapsuleClick(cap);
+          }}
+        />
+      )}
+
+      {/* Capsule launched — "O PORTAL SE ANCORA" cinematic fires on successful INSERT */}
+      {launchEvent && (
+        <CapsuleLaunchAnimation
+          event={launchEvent}
+          onClose={() => setLaunchEvent(null)}
+          onShare={() => {
+            const { lat, lng } = launchEvent;
+            setLaunchEvent(null);
+            if (navigator.share) {
+              navigator.share({
+                title: 'XPortl',
+                text: 'Deixei um portal aqui. Venha encontrar.',
+                url: `${window.location.origin}/app?lat=${lat.toFixed(5)}&lng=${lng.toFixed(5)}`,
+              }).catch(() => {});
+            }
+          }}
+          onViewMap={() => {
+            setLaunchEvent(null);
+            setActiveTab('map');
           }}
         />
       )}
