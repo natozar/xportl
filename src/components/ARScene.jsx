@@ -3,6 +3,7 @@ import { registerXPortlComponents } from '../aframe/registerComponents';
 import { isCapsuleLocked, getRarity } from '../services/capsules';
 import { isPing, PING_LIFETIME } from '../services/pings';
 import { clusterCapsules } from '../services/clustering';
+import { applyAdvancedTrackConstraints } from '../services/cameraCapabilities';
 
 const DEV_LAT = -23.5505;
 const DEV_LNG = -46.6333;
@@ -130,6 +131,30 @@ export default function ARScene({ capsules, pings, onCapsuleClick, onVortexClick
       }
       initializedRef.current = false;
     };
+  }, []);
+
+  // ── Push continuous autofocus / auto-exposure / auto-white-balance onto
+  // AR.js's camera track. AR.js calls getUserMedia internally with no
+  // advanced constraints, so the lens stays locked at whatever the driver
+  // boots with. Polling for the <video> is necessary because AR.js mounts
+  // it asynchronously after the scene 'loaded' event. Bails after 6s.
+  useEffect(() => {
+    let cancelled = false;
+    let attempts = 0;
+    const tryApply = () => {
+      if (cancelled) return;
+      const v = document.querySelector('a-scene video, #arjs-video, video[autoplay][playsinline]');
+      const stream = v?.srcObject;
+      const track = stream?.getVideoTracks?.()[0];
+      if (track) {
+        applyAdvancedTrackConstraints(track).catch(() => {});
+        return;
+      }
+      attempts += 1;
+      if (attempts < 60) setTimeout(tryApply, 100);
+    };
+    tryApply();
+    return () => { cancelled = true; };
   }, []);
 
   // ── Sync capsule + vortex entities ──

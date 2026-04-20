@@ -1,5 +1,14 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { preloadNsfwModel } from '../services/nsfwFilter';
+import {
+  pickBestBackCameraId,
+  applyAdvancedTrackConstraints,
+  supportsTorch,
+  setTorch,
+  tapToFocus,
+  adaptiveVideoBitrate,
+} from '../services/cameraCapabilities';
+import { useWakeLock } from '../hooks/useWakeLock';
 
 const MAX_VIDEO_SECONDS = 15;
 const MAX_IMAGE_DIMENSION = 4096;      // Full 4K — modern phones capture 48MP+
@@ -151,6 +160,13 @@ export default function CameraModal({ onClose, onCapture, initialMode = 'photo' 
   const [error, setError] = useState(null);
   const [loadingStream, setLoadingStream] = useState(true);
   const [retryTick, setRetryTick] = useState(0);
+  const [torchOn, setTorchOn] = useState(false);
+  const [torchAvailable, setTorchAvailable] = useState(false);
+  const bestBackIdRef = useRef(null); // cached deviceId of main wide back camera
+
+  // Keep the screen awake while the modal is open — capturing media is
+  // exactly the moment a user does NOT want the screen to dim.
+  useWakeLock(true);
 
   // Warm up the NSFW classifier while the user is framing the shot so the
   // confirmation step doesn't stall for 3-5 seconds on the first scan.
@@ -207,30 +223,66 @@ export default function CameraModal({ onClose, onCapture, initialMode = 'photo' 
         // whatever was holding it (AR.js or our own previous stream).
         await new Promise((r) => setTimeout(r, 300));
 
-        // Request the best the hardware can deliver.
-        // 'ideal' lets the browser pick the closest supported resolution
-        // without failing. Environment camera gets 4K request (phones
-        // typically cap at their native sensor); front camera gets 1080p.
+        // For the back camera, try to pin to the MAIN wide lens. Without
+        // this, browsers sometimes default to a telephoto or macro lens
+        // which has a tiny FOV and looks broken for AR-style framing.
         const isBack = facing === 'environment';
+        if (isBack && bestBackIdRef.current === null) {
+          bestBackIdRef.current = await pickBestBackCameraId().catch(() => null);
+        }
+        const lensId = isBack ? bestBackIdRef.current : null;
+
+        // Build constraints. deviceId (when known) is exact-pinned;
+        // facingMode is the safe fallback. 'ideal' on resolution lets
+        // the browser pick the closest the sensor actually supports.
+        const baseVideo = lensId
+          ? { deviceId: { exact: lensId } }
+          : { facingMode: facing };
+
         const videoConstraints = mode === 'video'
           ? {
-              facingMode: facing,
+              ...baseVideo,
               width:     { ideal: isBack ? 1920 : 1280 },
               height:    { ideal: isBack ? 1080 : 720 },
               frameRate: { ideal: 60, max: 60 },
             }
           : {
-              facingMode: facing,
+              ...baseVideo,
               width:  { ideal: isBack ? 4096 : 1920 },
               height: { ideal: isBack ? 3072 : 1080 },
             };
 
-        const stream = await requestStreamWithRetry({ video: videoConstraints, audio: false });
+        let stream;
+        try {
+          stream = await requestStreamWithRetry({ video: videoConstraints, audio: false });
+        } catch (err) {
+          // OverconstrainedError on a pinned deviceId → drop the pin and retry
+          // with facingMode so we still get *some* camera.
+          if (err?.name === 'OverconstrainedError' && lensId) {
+            console.warn('[XPortl] Best-lens pin rejected, falling back to facingMode');
+            bestBackIdRef.current = null;
+            const fallback = { ...videoConstraints };
+            delete fallback.deviceId;
+            fallback.facingMode = facing;
+            stream = await requestStreamWithRetry({ video: fallback, audio: false });
+          } else {
+            throw err;
+          }
+        }
         if (cancelled) {
           stream.getTracks().forEach((t) => t.stop());
           return;
         }
         streamRef.current = stream;
+
+        const track = stream.getVideoTracks()[0];
+        if (track) {
+          // Continuous AF/AE/AWB → sharper frames in changing light.
+          applyAdvancedTrackConstraints(track).catch(() => {});
+          setTorchAvailable(supportsTorch(track));
+          setTorchOn(false);
+        }
+
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
           videoRef.current.muted = true;
@@ -277,7 +329,33 @@ export default function CameraModal({ onClose, onCapture, initialMode = 'photo' 
   }, []);
 
   const toggleFacing = useCallback(() => {
+    // Switching cameras invalidates the cached lens pin (front cams have
+    // their own deviceId list).
+    bestBackIdRef.current = null;
     setFacing((f) => (f === 'environment' ? 'user' : 'environment'));
+  }, []);
+
+  const toggleTorch = useCallback(async () => {
+    const track = streamRef.current?.getVideoTracks?.()[0];
+    if (!track) return;
+    const next = !torchOn;
+    const ok = await setTorch(track, next);
+    if (ok) setTorchOn(next);
+  }, [torchOn]);
+
+  // Tap-to-focus: convert click coords to normalized (0..1) frame coords
+  // and ask the driver to focus + meter exposure on that point.
+  const handleVideoTap = useCallback(async (e) => {
+    const video = videoRef.current;
+    const track = streamRef.current?.getVideoTracks?.()[0];
+    if (!video || !track) return;
+    const rect = video.getBoundingClientRect();
+    const cx = (e.touches?.[0]?.clientX ?? e.clientX) - rect.left;
+    const cy = (e.touches?.[0]?.clientY ?? e.clientY) - rect.top;
+    const x = Math.max(0, Math.min(1, cx / rect.width));
+    const y = Math.max(0, Math.min(1, cy / rect.height));
+    await tapToFocus(track, x, y);
+    if (navigator.vibrate) navigator.vibrate(8);
   }, []);
 
   const _toggleMode = useCallback(() => {
@@ -334,13 +412,22 @@ export default function CameraModal({ onClose, onCapture, initialMode = 'photo' 
     }
 
     try {
+      // Prefer modern codecs first: AV1 → VP9 → VP8.
+      // AV1 cuts size ~50% vs VP9 at the same quality on devices that ship
+      // hardware decoders (Pixel 6+, iPhone 15+ via promo).
+      const mimeType =
+        MediaRecorder.isTypeSupported('video/webm;codecs=av01,opus') ? 'video/webm;codecs=av01,opus' :
+        MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus')  ? 'video/webm;codecs=vp9,opus'  :
+        MediaRecorder.isTypeSupported('video/webm;codecs=vp8,opus')  ? 'video/webm;codecs=vp8,opus'  :
+        'video/webm';
+
+      // Adaptive bitrate: don't slam a 4 Mbps stream into a 3G connection
+      // or a saveData session. adaptiveVideoBitrate inspects navigator.connection.
+      const videoBps = adaptiveVideoBitrate(VIDEO_BITRATE);
+
       const recorder = new MediaRecorder(recStream, {
-        mimeType: MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus')
-          ? 'video/webm;codecs=vp9,opus'
-          : MediaRecorder.isTypeSupported('video/webm;codecs=vp8,opus')
-          ? 'video/webm;codecs=vp8,opus'
-          : 'video/webm',
-        videoBitsPerSecond: VIDEO_BITRATE,
+        mimeType,
+        videoBitsPerSecond: videoBps,
         audioBitsPerSecond: AUDIO_BITRATE,
       });
       recorder.ondataavailable = (e) => {
@@ -448,7 +535,30 @@ export default function CameraModal({ onClose, onCapture, initialMode = 'photo' 
             muted
           />
 
+          {/* Tap-to-focus surface — sits above the (pointerEvents: none) video,
+              below the controls. Covers the full preview. */}
+          <div
+            style={s.focusSurface}
+            onClick={handleVideoTap}
+            onTouchStart={handleVideoTap}
+            aria-label="Toque para focar"
+          />
+
           <button style={s.closeBtn} onClick={onClose} aria-label="Fechar">×</button>
+
+          {torchAvailable && (
+            <button
+              style={{ ...s.torchBtn, ...(torchOn ? s.torchBtnOn : {}) }}
+              onClick={toggleTorch}
+              aria-label={torchOn ? 'Desligar lanterna' : 'Ligar lanterna'}
+            >
+              <svg width="22" height="22" viewBox="0 0 24 24" fill={torchOn ? '#ffd64a' : 'none'} stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M9 2h6l-1 6h-4z" />
+                <path d="M8 8h8l-1 4H9z" />
+                <path d="M10 12h4v8a2 2 0 0 1-4 0z" />
+              </svg>
+            </button>
+          )}
 
           {mode === 'video' && recording && (
             <div style={s.recBadge}>
@@ -574,6 +684,30 @@ const s = {
     lineHeight: 1, padding: 0,
     pointerEvents: 'auto',
     WebkitTapHighlightColor: 'transparent',
+  },
+  focusSurface: {
+    position: 'absolute', inset: 0, zIndex: 2,
+    background: 'transparent',
+    pointerEvents: 'auto',
+    WebkitTapHighlightColor: 'transparent',
+    cursor: 'crosshair',
+  },
+  torchBtn: {
+    position: 'absolute', top: 'calc(14px + env(safe-area-inset-top, 0px))', left: 14,
+    width: 44, height: 44,
+    borderRadius: '50%', background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(10px)',
+    WebkitBackdropFilter: 'blur(10px)',
+    color: '#fff', border: '1px solid rgba(255,255,255,0.2)',
+    cursor: 'pointer', zIndex: 10, display: 'flex', alignItems: 'center', justifyContent: 'center',
+    padding: 0, pointerEvents: 'auto',
+    WebkitTapHighlightColor: 'transparent',
+    transition: 'background 0.18s ease, border-color 0.18s ease, color 0.18s ease',
+  },
+  torchBtnOn: {
+    background: 'rgba(255,214,74,0.22)',
+    borderColor: 'rgba(255,214,74,0.7)',
+    color: '#ffd64a',
+    boxShadow: '0 0 22px rgba(255,214,74,0.35)',
   },
   recBadge: {
     position: 'absolute', top: 'calc(18px + env(safe-area-inset-top, 0px))',

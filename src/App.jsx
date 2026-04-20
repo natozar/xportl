@@ -33,6 +33,7 @@ import { useGeolocation } from './hooks/useGeolocation';
 import { useCamera } from './hooks/useCamera';
 import { usePwaInstall } from './hooks/usePwaInstall';
 import { useCompassHeading } from './hooks/useCompassHeading';
+import { useWakeLock } from './hooks/useWakeLock';
 import { createCapsule, getNearbyCapsules, subscribeToCapsuleChanges, haversineDistance } from './services/capsules';
 import { createPing } from './services/pings';
 import { clusterCapsules } from './services/clustering';
@@ -299,6 +300,12 @@ export default function App() {
   const permissionsGranted = geo.granted && cam.granted;
   const legalGatesCleared = session && profile && !showTos && !showDisclaimer && !blocked
     && hasAcceptedTos(profile) && hasAcceptedLocationDisclaimer(profile);
+
+  // Keep the screen awake whenever the user is in an AR-active context.
+  // The AR camera + GPS + compass stack expects the screen to stay on;
+  // letting it sleep wrecks the experience and breaks rotation locks on
+  // some Androids. Released automatically when the conditions flip false.
+  useWakeLock(legalGatesCleared && (activeTab === 'explore' || activeTab === 'indoor' || !!hunt.targetId));
 
   const markReady = () => {
     if (!ready) {
