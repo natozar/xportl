@@ -326,24 +326,27 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [permissionsGranted, legalGatesCleared, ready]);
 
-  // ── Re-arm GPS / camera on reload when PermissionGate was bypassed ──
+  // ── Re-arm GPS on reload when PermissionGate was bypassed ──
   // `ready` is persisted in localStorage, so returning users skip PermissionGate
-  // entirely and `geo.request()` / `cam.request()` are never called for the new
-  // session — watchPosition never starts → lat/lng stay null → Radar stuck on
-  // "localizando" and scan is blocked by the null-coord guard. The browser still
-  // remembers the permission grant so the calls succeed without re-prompting.
-  const permsRearmedRef = useRef(false);
+  // entirely and `geo.request()` is never called for the new session —
+  // watchPosition never starts → lat/lng stay null → Radar stuck on "localizando"
+  // and scan is blocked by the null-coord guard. The browser still remembers the
+  // permission grant so the call succeeds without re-prompting.
+  //
+  // NOTE: Do NOT re-arm `cam.request()` here. ARScene mounts as soon as ready=true
+  // and opens its own getUserMedia stream; a parallel getUserMedia call from this
+  // hook races with that and deadlocks the Android camera pipeline ("portal camera
+  // won't open"). Camera permission is already granted by the browser across
+  // sessions, and `cam.granted` is only consulted by the PermissionGate which is
+  // bypassed in this code path, so leaving it false is harmless.
+  const gpsRearmedRef = useRef(false);
   useEffect(() => {
-    if (!ready || permsRearmedRef.current) return;
-    permsRearmedRef.current = true;
+    if (!ready || gpsRearmedRef.current) return;
+    gpsRearmedRef.current = true;
     if (!geo.granted && !geo.denied && !geo.loading) {
       geo.request().catch(() => { /* state handles denial */ });
     }
-    if (!cam.granted && !cam.denied && !cam.loading) {
-      cam.request();
-    }
-    // geo.request / cam.request are stable (useCallback([])) — deps kept minimal
-    // so the re-arm only fires on ready transitions, not every granted/denied flip.
+    // geo.request is stable (useCallback([])); only re-arm once per ready transition.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready]);
 
