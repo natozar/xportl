@@ -5,6 +5,27 @@ import App from './App';
 import ErrorBoundary from './components/ErrorBoundary';
 import './styles/global.css';
 
+// In-app mobile console — activate with ?debug=1 in the URL.
+// Dynamic import so Eruda (~400KB) is code-split and never loads in prod
+// unless explicitly requested. Also persisted via sessionStorage so it
+// survives page reloads within the same debug session.
+(function () {
+  try {
+    const qs = new window.URLSearchParams(window.location.search);
+    if (qs.get('debug') === '1') sessionStorage.setItem('xportl_debug', '1');
+    if (qs.get('debug') === '0') sessionStorage.removeItem('xportl_debug');
+    if (sessionStorage.getItem('xportl_debug') === '1') {
+      import('eruda').then((mod) => {
+        const eruda = mod.default || mod;
+        eruda.init({ tool: ['console', 'network', 'elements', 'resources', 'info'] });
+        // Pre-filter to our own log namespaces for quick signal
+        try { eruda.get('console').filter('XPortl'); } catch { /* optional */ }
+        console.log('[XPortl Debug] Eruda active. Filter: "XPortl". Use ?debug=0 to disable.');
+      }).catch((e) => console.warn('[XPortl Debug] Eruda load failed:', e));
+    }
+  } catch { /* noop — SSR or blocked storage */ }
+})();
+
 // Kill-switch: legacy SWs
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.getRegistrations().then((regs) => {
