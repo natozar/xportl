@@ -1,0 +1,41 @@
+# XPortl — robots.txt
+# ──────────────────────────────────────────────────────────
+# Crawlers are welcome on the marketing LP and legal docs.
+# The authenticated app (/app), godmode (/godmode), and any
+# future private routes should not be indexed.
+
+User-agent: *
+Allow: /
+Allow: /TERMOS_DE_USO.md
+Allow: /POLITICA_DE_PRIVACIDADE.md
+Disallow: /app
+Disallow: /godmode
+Disallow: /api/
+Disallow: /*?code=
+Disallow: /*?error=
+
+# Social card scrapers — let them in explicitly so the
+# previews always resolve (some are conservative about UAs
+# they don't recognize).
+User-agent: facebookexternalhit
+Allow: /
+
+User-agent: Twitterbot
+Allow: /
+
+User-agent: LinkedInBot
+Allow: /
+
+User-agent: WhatsApp
+Allow: /
+
+User-agent: TelegramBot
+Allow: /
+
+User-agent: Discordbot
+Allow: /
+
+User-agent: Slackbot-LinkExpanding
+Allow: /
+
+Sitemap: https://xportl.com/sitemap.xml

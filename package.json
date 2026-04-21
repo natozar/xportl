@@ -9,7 +9,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "lint": "eslint src/",
-    "format": "prettier --write src/"
+    "format": "prettier --write src/",
+    "og:generate": "node scripts/generate-og.mjs"
   },
   "dependencies": {
     "@lottiefiles/lottie-player": "^2.0.12",
@@ -29,6 +30,7 @@
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "^7.0.1",
     "prettier": "^3.8.3",
+    "sharp": "^0.34.5",
     "vite": "^6.3.2",
     "vite-plugin-pwa": "^1.2.0"
   },

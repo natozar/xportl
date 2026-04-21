@@ -1,0 +1,164 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630">
+  <defs>
+    <!-- Deep void → ink gradient -->
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0F0B1E"/>
+      <stop offset="55%" stop-color="#0A0718"/>
+      <stop offset="100%" stop-color="#07040F"/>
+    </linearGradient>
+
+    <!-- Cyan halo top-left -->
+    <radialGradient id="haloCyan" cx="18%" cy="18%" r="55%">
+      <stop offset="0%" stop-color="#6FF7FF" stop-opacity="0.18"/>
+      <stop offset="60%" stop-color="#6FF7FF" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- Plum halo bottom-right -->
+    <radialGradient id="haloPlum" cx="85%" cy="82%" r="55%">
+      <stop offset="0%" stop-color="#A77BFF" stop-opacity="0.16"/>
+      <stop offset="60%" stop-color="#A77BFF" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- Ember warm glow bottom -->
+    <radialGradient id="haloEmber" cx="50%" cy="110%" r="45%">
+      <stop offset="0%" stop-color="#FF8A5C" stop-opacity="0.10"/>
+      <stop offset="70%" stop-color="#FF8A5C" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- Portal core: cyan to plum -->
+    <radialGradient id="portalCore" cx="50%" cy="45%" r="55%">
+      <stop offset="0%" stop-color="#E9FDFF" stop-opacity="0.95"/>
+      <stop offset="25%" stop-color="#6FF7FF" stop-opacity="0.75"/>
+      <stop offset="65%" stop-color="#A77BFF" stop-opacity="0.35"/>
+      <stop offset="100%" stop-color="#A77BFF" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- Brand mark: cyan → plum -->
+    <radialGradient id="mark" cx="30%" cy="30%" r="75%">
+      <stop offset="0%" stop-color="#6FF7FF"/>
+      <stop offset="70%" stop-color="#A77BFF"/>
+    </radialGradient>
+
+    <!-- Grid pattern (subtle) -->
+    <pattern id="grid" x="0" y="0" width="72" height="72" patternUnits="userSpaceOnUse">
+      <path d="M 72 0 L 0 0 0 72" fill="none" stroke="#F4EFE6" stroke-opacity="0.028" stroke-width="1"/>
+    </pattern>
+
+    <!-- Mask for grid so it fades at edges -->
+    <radialGradient id="gridFade" cx="50%" cy="45%" r="62%">
+      <stop offset="0%" stop-color="#fff" stop-opacity="1"/>
+      <stop offset="100%" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
+    <mask id="gridMask">
+      <rect width="1200" height="630" fill="url(#gridFade)"/>
+    </mask>
+  </defs>
+
+  <!-- Base background layers -->
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  <rect width="1200" height="630" fill="url(#haloCyan)"/>
+  <rect width="1200" height="630" fill="url(#haloPlum)"/>
+  <rect width="1200" height="630" fill="url(#haloEmber)"/>
+  <rect width="1200" height="630" fill="url(#grid)" mask="url(#gridMask)"/>
+
+  <!-- Top-left field bar -->
+  <g font-family="'Courier New', Consolas, monospace" font-size="14" letter-spacing="3" fill="#F4EFE6" fill-opacity="0.45">
+    <circle cx="54" cy="54" r="4" fill="#9FE870"/>
+    <text x="68" y="59">AO VIVO</text>
+    <text x="150" y="59" fill-opacity="0.25">/</text>
+    <text x="164" y="59">XPORTL · FIELD LOG VOL.01</text>
+  </g>
+
+  <!-- Top-right coords -->
+  <g font-family="'Courier New', Consolas, monospace" font-size="14" letter-spacing="3" fill="#F4EFE6" fill-opacity="0.35" text-anchor="end">
+    <text x="1146" y="59">-23.5614°S · -46.6565°W</text>
+  </g>
+
+  <!-- Eyebrow (pill) -->
+  <g transform="translate(72, 140)">
+    <rect x="0" y="0" width="342" height="36" rx="18" fill="#F4EFE6" fill-opacity="0.04" stroke="#F4EFE6" stroke-opacity="0.15"/>
+    <circle cx="18" cy="18" r="4" fill="#9FE870"/>
+    <text x="32" y="23" font-family="'Courier New', Consolas, monospace" font-size="13" letter-spacing="3" fill="#F4EFE6" fill-opacity="0.7">EARLY ACCESS · REALIDADE AUMENTADA</text>
+  </g>
+
+  <!-- Headline: "O mundo real agora tem portais." -->
+  <g transform="translate(72, 210)">
+    <text font-family="Georgia, 'Times New Roman', serif" font-size="96" fill="#F4EFE6" letter-spacing="-3">
+      <tspan x="0" y="80">O mundo real</tspan>
+      <tspan x="0" y="180">agora <tspan font-style="italic" fill="#FF8A5C">tem</tspan></tspan>
+      <tspan x="0" y="280" font-style="italic" fill="#6FF7FF">portais<tspan fill="#FF8A5C">.</tspan></tspan>
+    </text>
+  </g>
+
+  <!-- Subhead -->
+  <g transform="translate(72, 532)">
+    <text font-family="Arial, Helvetica, sans-serif" font-size="22" fill="#F4EFE6" fill-opacity="0.75" letter-spacing="-0.3">
+      <tspan x="0" y="0">A primeira rede social em RA ancorada em coordenadas reais.</tspan>
+      <tspan x="0" y="30" fill-opacity="0.55">Deixe cápsulas do tempo. Encontre rastros de quem passou antes.</tspan>
+    </text>
+  </g>
+
+  <!-- ── Right side: stylized portal ── -->
+  <g transform="translate(905, 315)">
+    <!-- Outer soft glow -->
+    <circle cx="0" cy="0" r="220" fill="url(#portalCore)" opacity="0.85"/>
+
+    <!-- Outer ring -->
+    <circle cx="0" cy="0" r="160" fill="none" stroke="#6FF7FF" stroke-opacity="0.35" stroke-width="1.5"/>
+    <!-- Middle ring -->
+    <circle cx="0" cy="0" r="118" fill="none" stroke="#6FF7FF" stroke-opacity="0.55" stroke-width="1.5"/>
+    <!-- Inner ring -->
+    <circle cx="0" cy="0" r="78" fill="none" stroke="#A77BFF" stroke-opacity="0.7" stroke-width="1.5"/>
+    <!-- Core -->
+    <circle cx="0" cy="0" r="44" fill="#6FF7FF" fill-opacity="0.18" stroke="#6FF7FF" stroke-opacity="0.8" stroke-width="1.5"/>
+    <circle cx="0" cy="0" r="16" fill="#E9FDFF" fill-opacity="0.9"/>
+
+    <!-- Sweep -->
+    <line x1="0" y1="0" x2="160" y2="-20" stroke="#6FF7FF" stroke-opacity="0.45" stroke-width="1"/>
+
+    <!-- Coordinate ticks -->
+    <g stroke="#6FF7FF" stroke-opacity="0.5" stroke-width="1.5">
+      <line x1="0" y1="-175" x2="0" y2="-160"/>
+      <line x1="0" y1="160" x2="0" y2="175"/>
+      <line x1="-175" y1="0" x2="-160" y2="0"/>
+      <line x1="160" y1="0" x2="175" y2="0"/>
+    </g>
+  </g>
+
+  <!-- Bottom-left: brand + URL -->
+  <g transform="translate(72, 585)">
+    <!-- Brand mark -->
+    <circle cx="12" cy="-6" r="12" fill="url(#mark)"/>
+    <!-- Brand wordmark -->
+    <text x="34" y="0" font-family="Georgia, 'Times New Roman', serif" font-style="italic" font-size="28" fill="#F4EFE6">xportl<tspan font-style="normal" fill="#FF8A5C">.</tspan></text>
+    <!-- Separator -->
+    <text x="144" y="-1" font-family="'Courier New', monospace" font-size="16" fill="#F4EFE6" fill-opacity="0.2">/</text>
+    <!-- URL -->
+    <text x="160" y="-1" font-family="'Courier New', Consolas, monospace" font-size="15" letter-spacing="2" fill="#F4EFE6" fill-opacity="0.5">XPORTL.COM</text>
+  </g>
+
+  <!-- Bottom-right: tag -->
+  <g transform="translate(1146, 585)" text-anchor="end">
+    <text font-family="'Courier New', Consolas, monospace" font-size="13" letter-spacing="3" fill="#F4EFE6" fill-opacity="0.35">PWA · WEBGL · SEM DOWNLOAD</text>
+  </g>
+
+  <!-- Hairline frames to feel editorial -->
+  <g stroke="#F4EFE6" stroke-opacity="0.12" fill="none">
+    <!-- Top rule -->
+    <line x1="72" y1="110" x2="1128" y2="110" stroke-width="1"/>
+    <!-- Bottom rule -->
+    <line x1="72" y1="520" x2="1128" y2="520" stroke-width="1"/>
+  </g>
+
+  <!-- Corner brackets (field-journal motif) -->
+  <g stroke="#F4EFE6" stroke-opacity="0.25" fill="none" stroke-width="1.5">
+    <!-- Top-left -->
+    <path d="M 38 38 L 38 62 M 38 38 L 62 38"/>
+    <!-- Top-right -->
+    <path d="M 1162 38 L 1162 62 M 1162 38 L 1138 38"/>
+    <!-- Bottom-left -->
+    <path d="M 38 592 L 38 568 M 38 592 L 62 592"/>
+    <!-- Bottom-right -->
+    <path d="M 1162 592 L 1162 568 M 1162 592 L 1138 592"/>
+  </g>
+</svg>

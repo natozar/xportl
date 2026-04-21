@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
+
+  <url>
+    <loc>https://xportl.com/</loc>
+    <lastmod>2026-04-21</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
+    <image:image>
+      <image:loc>https://xportl.com/og-image.png</image:loc>
+      <image:title>XPortl — O mundo real agora tem portais</image:title>
+      <image:caption>Rede social em realidade aumentada ancorada em coordenadas reais.</image:caption>
+    </image:image>
+  </url>
+
+  <url>
+    <loc>https://xportl.com/TERMOS_DE_USO.md</loc>
+    <lastmod>2026-04-21</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.3</priority>
+  </url>
+
+  <url>
+    <loc>https://xportl.com/POLITICA_DE_PRIVACIDADE.md</loc>
+    <lastmod>2026-04-21</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.3</priority>
+  </url>
+
+</urlset>

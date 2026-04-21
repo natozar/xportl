@@ -24,18 +24,92 @@
   img-src 'self' data:;
   connect-src 'self';
 " />
+
+<!-- ─ SEO primary ─────────────────────────────────────── -->
 <title>XPortl — O mundo real agora tem portais</title>
-<meta name="description" content="A primeira rede social em realidade aumentada ancorada em coordenadas reais. Deixe cápsulas do tempo. Encontre rastros de quem passou antes." />
+<meta name="description" content="Rede social em realidade aumentada ancorada em coordenadas reais. Deixe cápsulas do tempo. Encontre rastros de quem passou antes — exatamente onde estiveram. Sem download, direto no navegador." />
+<meta name="keywords" content="realidade aumentada, AR, rede social, cápsulas do tempo, geolocalização, portais, rastros, PWA, GPS, Brasil" />
+<meta name="author" content="XPortl" />
+<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
+<meta name="googlebot" content="index, follow, max-image-preview:large" />
+<link rel="canonical" href="https://xportl.com/" />
 
-<meta property="og:title" content="XPortl — O mundo real agora tem portais" />
-<meta property="og:description" content="Deixe rastros. Encontre portais. Cápsulas do tempo em realidade aumentada." />
-<meta property="og:image" content="/icons/icon-512.png" />
+<!-- ─ Open Graph (WhatsApp, Telegram, Discord, Facebook, LinkedIn) ─ -->
+<meta property="og:site_name" content="XPortl" />
 <meta property="og:type" content="website" />
-<meta property="og:url" content="https://xportl.com" />
-<meta name="twitter:card" content="summary_large_image" />
+<meta property="og:locale" content="pt_BR" />
+<meta property="og:url" content="https://xportl.com/" />
+<meta property="og:title" content="XPortl — O mundo real agora tem portais" />
+<meta property="og:description" content="Rede social em realidade aumentada ancorada em coordenadas reais. Deixe cápsulas do tempo. Encontre rastros de quem passou antes. Sem download." />
+<meta property="og:image" content="https://xportl.com/og-image.png?v=2" />
+<meta property="og:image:secure_url" content="https://xportl.com/og-image.png?v=2" />
+<meta property="og:image:type" content="image/png" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta property="og:image:alt" content="XPortl — O mundo real agora tem portais. Rede social em realidade aumentada." />
 
+<!-- ─ Twitter / X Cards ───────────────────────────────── -->
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:domain" content="xportl.com" />
+<meta name="twitter:url" content="https://xportl.com/" />
+<meta name="twitter:title" content="XPortl — O mundo real agora tem portais" />
+<meta name="twitter:description" content="Rede social em realidade aumentada ancorada em coordenadas reais. Deixe cápsulas do tempo. Encontre rastros." />
+<meta name="twitter:image" content="https://xportl.com/og-image.png?v=2" />
+<meta name="twitter:image:alt" content="XPortl — O mundo real agora tem portais." />
+
+<!-- ─ Icons ────────────────────────────────────────────── -->
 <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+<link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png" />
+<link rel="icon" type="image/png" sizes="512x512" href="/icons/icon-512.png" />
 <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+
+<!-- ─ JSON-LD structured data ─────────────────────────── -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://xportl.com/#org",
+      "name": "XPortl",
+      "url": "https://xportl.com/",
+      "logo": {
+        "@type": "ImageObject",
+        "url": "https://xportl.com/icons/icon-512.png",
+        "width": 512,
+        "height": 512
+      },
+      "sameAs": []
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://xportl.com/#site",
+      "url": "https://xportl.com/",
+      "name": "XPortl",
+      "description": "Rede social em realidade aumentada ancorada em coordenadas reais.",
+      "publisher": { "@id": "https://xportl.com/#org" },
+      "inLanguage": "pt-BR"
+    },
+    {
+      "@type": "WebApplication",
+      "name": "XPortl",
+      "url": "https://xportl.com/app",
+      "description": "Deixe cápsulas do tempo em realidade aumentada ancoradas em coordenadas reais. Encontre rastros de quem passou antes.",
+      "applicationCategory": "SocialNetworkingApplication",
+      "operatingSystem": "Web (PWA) · iOS Safari 15+ · Chrome 100+",
+      "offers": { "@type": "Offer", "price": "0", "priceCurrency": "BRL" },
+      "featureList": [
+        "Realidade aumentada em navegador",
+        "Geolocalização GPS",
+        "Cápsulas do tempo",
+        "Modo caça",
+        "Moderação NSFW no dispositivo",
+        "PWA instalável"
+      ]
+    }
+  ]
+}
+</script>
 
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
