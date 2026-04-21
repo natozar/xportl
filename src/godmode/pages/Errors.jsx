@@ -272,7 +272,7 @@ export default function Errors() {
   const [errors, setErrors] = useState(null);
   const [filter, setFilter] = useState('all');
   const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState({ total: 0, unresolved: 0, critical: 0, usersAffected: 0 });
+  const [stats, setStats] = useState({ total: 0, unresolved: 0, resolved: 0, critical: 0, usersAffected: 0 });
   const [expandedId, setExpandedId] = useState(null);
   const [copiedId, setCopiedId] = useState(null);
   const [view, setView] = useState('grouped'); // 'grouped' | 'raw'
@@ -313,22 +313,29 @@ export default function Errors() {
   const fetchErrors = useCallback(async () => {
     setLoading(true);
 
-    let query = supabase.from('error_events').select('*').order('captured_at', { ascending: false }).limit(500);
+    let query = supabase.from('error_events').select('*').limit(500);
+    if (filter === 'resolved') {
+      query = query.not('resolved_at', 'is', null).order('resolved_at', { ascending: false });
+    } else {
+      query = query.order('captured_at', { ascending: false });
+    }
     if (filter === 'unresolved') query = query.is('resolved_at', null);
     if (filter === 'critical') query = query.eq('severity', 'critical');
 
     const { data } = await query;
     setErrors(data || []);
 
-    const [{ count: total }, { count: unresolved }, { count: critical }, { data: affectedRaw }] = await Promise.all([
+    const [{ count: total }, { count: unresolved }, { count: resolved }, { count: critical }, { data: affectedRaw }] = await Promise.all([
       supabase.from('error_events').select('*', { count: 'exact', head: true }),
       supabase.from('error_events').select('*', { count: 'exact', head: true }).is('resolved_at', null),
+      supabase.from('error_events').select('*', { count: 'exact', head: true }).not('resolved_at', 'is', null),
       supabase.from('error_events').select('*', { count: 'exact', head: true }).eq('severity', 'critical'),
       supabase.from('error_events').select('user_id').is('resolved_at', null).not('user_id', 'is', null),
     ]);
     setStats({
       total: total || 0,
       unresolved: unresolved || 0,
+      resolved: resolved || 0,
       critical: critical || 0,
       usersAffected: new Set((affectedRaw || []).map((e) => e.user_id)).size,
     });
@@ -348,6 +355,14 @@ export default function Errors() {
         existing.count += 1;
         existing.users.add(e.user_id || 'anon');
         if (!e.resolved_at) existing.openCount += 1;
+        if (e.resolved_at) {
+          existing.resolvedCount += 1;
+          if (!existing.lastResolvedAt || new Date(e.resolved_at) > new Date(existing.lastResolvedAt)) {
+            existing.lastResolvedAt = e.resolved_at;
+            existing.lastResolutionType = e.resolution_type || null;
+            existing.lastResolvedBy = e.resolved_by || null;
+          }
+        }
         if (new Date(e.captured_at) > new Date(existing.lastSeen)) {
           existing.lastSeen = e.captured_at;
           existing.sample = e; // freshest sample is most useful
@@ -361,6 +376,10 @@ export default function Errors() {
           sample: e,
           count: 1,
           openCount: e.resolved_at ? 0 : 1,
+          resolvedCount: e.resolved_at ? 1 : 0,
+          lastResolvedAt: e.resolved_at || null,
+          lastResolutionType: e.resolved_at ? (e.resolution_type || null) : null,
+          lastResolvedBy: e.resolved_at ? (e.resolved_by || null) : null,
           users: new Set([e.user_id || 'anon']),
           firstSeen: e.captured_at,
           lastSeen: e.captured_at,
@@ -370,11 +389,17 @@ export default function Errors() {
     return Array.from(map.values())
       .map((g) => ({ ...g, users: g.users.size }))
       .sort((a, b) => {
+        if (filter === 'resolved') {
+          // Most recently resolved first
+          const ta = a.lastResolvedAt ? new Date(a.lastResolvedAt).getTime() : 0;
+          const tb = b.lastResolvedAt ? new Date(b.lastResolvedAt).getTime() : 0;
+          return tb - ta;
+        }
         // Open > resolved, then by count desc
         if ((a.openCount > 0) !== (b.openCount > 0)) return a.openCount > 0 ? -1 : 1;
         return b.count - a.count;
       });
-  }, [errors]);
+  }, [errors, filter]);
 
   const openGroups = useMemo(() => groups.filter((g) => g.openCount > 0), [groups]);
   const megaPrompt = useMemo(() => buildMegaPrompt(openGroups), [openGroups]);
@@ -400,6 +425,17 @@ export default function Errors() {
     fetchErrors();
   };
 
+  const reopenGroup = async (sig) => {
+    const ids = (errors || []).filter((e) => e.resolved_at && errorSignature(e) === sig).map((e) => e.id);
+    if (!ids.length) return;
+    await supabase.from('error_events').update({
+      resolved_at: null,
+      resolved_by: null,
+      resolution_type: null,
+    }).in('id', ids);
+    fetchErrors();
+  };
+
   const copyPrompt = (text, id) => {
     navigator.clipboard.writeText(text).then(() => {
       setCopiedId(id);
@@ -415,6 +451,7 @@ export default function Errors() {
       <div style={st.statsBar}>
         <Stat num={stats.total} label="total" color="#c8c8e0" />
         <Stat num={stats.unresolved} label="abertos" color={stats.unresolved > 0 ? '#ffaa00' : '#00e5ff'} />
+        <Stat num={stats.resolved} label="corrigidos" color={stats.resolved > 0 ? '#9FE870' : '#55556a'} />
         <Stat num={stats.critical} label="criticos" color={stats.critical > 0 ? '#ff4466' : '#00e5ff'} />
         <Stat num={stats.usersAffected} label="users afetados" color={stats.usersAffected > 0 ? '#ff8844' : '#00e5ff'} />
         <Stat num={openGroups.length} label="bugs unicos abertos" color={openGroups.length > 0 ? '#00e5ff' : '#55556a'} />
@@ -441,7 +478,7 @@ export default function Errors() {
 
       {/* Filters */}
       <div style={st.filters}>
-        {[['all', 'Todos'], ['unresolved', 'Abertos'], ['critical', 'Criticos']].map(([f, label]) => (
+        {[['all', 'Todos'], ['unresolved', 'Abertos'], ['resolved', 'Corrigidos'], ['critical', 'Criticos']].map(([f, label]) => (
           <button key={f} style={{ ...st.filterBtn, ...(filter === f ? st.filterActive : {}) }} onClick={() => setFilter(f)}>{label}</button>
         ))}
         <div style={st.viewToggle}>
@@ -479,7 +516,16 @@ export default function Errors() {
               <span style={st.errorTitle}>{e.error_name || 'Unknown'}</span>
               <span style={st.usersTag}>{g.users} user{g.users !== 1 ? 's' : ''}</span>
               <span style={st.time}>{g.lastSeen ? new Date(g.lastSeen).toLocaleString('pt-BR') : '---'}</span>
-              {g.openCount === 0 && <span style={st.resolvedBadge}>RESOLVIDO</span>}
+              {g.openCount === 0 && (
+                <span style={{ ...st.resolvedBadge, ...(g.lastResolutionType === 'ignored' ? st.ignoredBadge : {}) }}>
+                  {g.lastResolutionType === 'ignored' ? 'IGNORADO' : 'CORRIGIDO'}
+                </span>
+              )}
+              {g.openCount > 0 && g.resolvedCount > 0 && (
+                <span style={st.partialBadge} title={`${g.resolvedCount} corrigido(s) · ${g.openCount} aberto(s)`}>
+                  {g.resolvedCount}/{g.count} fix
+                </span>
+              )}
               <span style={st.chevron}>{expanded ? '▲' : '▼'}</span>
             </div>
 
@@ -493,6 +539,26 @@ export default function Errors() {
                 : fix;
               return (
               <div style={st.details}>
+                {/* Resolution summary (when this group has any resolved events) */}
+                {g.resolvedCount > 0 && (
+                  <div style={{ ...st.resolutionBox, ...(g.lastResolutionType === 'ignored' ? st.resolutionBoxIgnored : {}) }}>
+                    <span style={st.resolutionIcon}>{g.lastResolutionType === 'ignored' ? '—' : '✓'}</span>
+                    <div style={st.resolutionBody}>
+                      <div style={st.resolutionTitle}>
+                        {g.lastResolutionType === 'ignored' ? 'Marcado como ignorado' : 'Marcado como corrigido'}
+                        {g.openCount > 0 && (
+                          <span style={st.resolutionPartial}> · {g.openCount} ocorrência(s) nova(s) ainda aberta(s)</span>
+                        )}
+                      </div>
+                      <div style={st.resolutionMeta}>
+                        {g.resolvedCount}/{g.count} evento(s)
+                        {g.lastResolvedAt && <> · {new Date(g.lastResolvedAt).toLocaleString('pt-BR')}</>}
+                        {g.lastResolvedBy && <> · por {g.lastResolvedBy}</>}
+                        {g.lastResolutionType && <> · tipo: {g.lastResolutionType}</>}
+                      </div>
+                    </div>
+                  </div>
+                )}
                 {/* AI Diagnosis */}
                 <div style={st.aiBox}>
                   <div style={st.aiHeader}>
@@ -552,8 +618,13 @@ export default function Errors() {
 
                 {g.openCount > 0 && (
                   <div style={st.actions}>
-                    <button style={{ ...st.actionBtn, ...st.actionFix }} onClick={() => resolveGroup(g.sig, 'manual-fix')}>Resolver grupo ({g.openCount})</button>
+                    <button style={{ ...st.actionBtn, ...st.actionFix }} onClick={() => resolveGroup(g.sig, 'manual-fix')}>Marcar como corrigido ({g.openCount})</button>
                     <button style={st.actionBtn} onClick={() => resolveGroup(g.sig, 'ignored')}>Ignorar grupo</button>
+                  </div>
+                )}
+                {g.openCount === 0 && g.resolvedCount > 0 && (
+                  <div style={st.actions}>
+                    <button style={st.actionBtn} onClick={() => reopenGroup(g.sig)}>Reabrir grupo ({g.resolvedCount})</button>
                   </div>
                 )}
               </div>
@@ -573,7 +644,11 @@ export default function Errors() {
               <span style={{ ...st.badge, color: e.severity === 'critical' ? '#ff4466' : '#ff8844' }}>{fix.category}</span>
               <span style={st.errorTitle}>{e.error_name || 'Unknown'}</span>
               <span style={st.time}>{e.captured_at ? new Date(e.captured_at).toLocaleString('pt-BR') : '---'}</span>
-              {e.resolved_at && <span style={st.resolvedBadge}>RESOLVIDO</span>}
+              {e.resolved_at && (
+                <span style={{ ...st.resolvedBadge, ...(e.resolution_type === 'ignored' ? st.ignoredBadge : {}) }}>
+                  {e.resolution_type === 'ignored' ? 'IGNORADO' : 'CORRIGIDO'}
+                </span>
+              )}
               <span style={st.chevron}>{expanded ? '▲' : '▼'}</span>
             </div>
             <div style={st.msg}>{e.error_message || '(sem mensagem)'}</div>
@@ -590,10 +665,16 @@ export default function Errors() {
                     <pre style={st.promptText}>{fix.prompt}</pre>
                   </div>
                 </div>
-                {!e.resolved_at && (
+                {!e.resolved_at ? (
                   <div style={st.actions}>
-                    <button style={{ ...st.actionBtn, ...st.actionFix }} onClick={() => resolveError(e.id, 'manual-fix')}>Resolvido</button>
+                    <button style={{ ...st.actionBtn, ...st.actionFix }} onClick={() => resolveError(e.id, 'manual-fix')}>Marcar como corrigido</button>
                     <button style={st.actionBtn} onClick={() => resolveError(e.id, 'ignored')}>Ignorar</button>
+                  </div>
+                ) : (
+                  <div style={st.resolutionMeta}>
+                    {e.resolution_type === 'ignored' ? 'Ignorado' : 'Corrigido'}
+                    {' · '}{new Date(e.resolved_at).toLocaleString('pt-BR')}
+                    {e.resolved_by && <> · por {e.resolved_by}</>}
                   </div>
                 )}
               </div>
@@ -667,7 +748,32 @@ const st = {
   errorTitle: { fontSize: '0.78rem', fontWeight: 600, color: '#e8e8f0', flex: 1 },
   usersTag: { fontSize: '0.58rem', color: '#8888a0', letterSpacing: '0.05em' },
   time: { fontSize: '0.58rem', color: '#55556a' },
-  resolvedBadge: { fontSize: '0.48rem', fontWeight: 700, color: '#00e5ff', background: 'rgba(0,229,255,0.1)', padding: '2px 6px', borderRadius: 4, letterSpacing: '0.1em' },
+  resolvedBadge: { fontSize: '0.48rem', fontWeight: 700, color: '#9FE870', background: 'rgba(159,232,112,0.12)', padding: '2px 6px', borderRadius: 4, letterSpacing: '0.1em', border: '1px solid rgba(159,232,112,0.25)' },
+  ignoredBadge: { color: '#8888a0', background: 'rgba(136,136,160,0.1)', border: '1px solid rgba(136,136,160,0.25)' },
+  partialBadge: { fontSize: '0.48rem', fontWeight: 700, color: '#ffaa00', background: 'rgba(255,170,0,0.1)', padding: '2px 6px', borderRadius: 4, letterSpacing: '0.1em', border: '1px solid rgba(255,170,0,0.25)' },
+
+  resolutionBox: {
+    display: 'flex',
+    alignItems: 'flex-start',
+    gap: 10,
+    padding: '10px 12px',
+    marginBottom: 12,
+    background: 'rgba(159,232,112,0.06)',
+    border: '1px solid rgba(159,232,112,0.2)',
+    borderLeft: '3px solid #9FE870',
+    borderRadius: 6,
+  },
+  resolutionBoxIgnored: {
+    background: 'rgba(136,136,160,0.06)',
+    border: '1px solid rgba(136,136,160,0.2)',
+    borderLeft: '3px solid #8888a0',
+  },
+  resolutionIcon: { fontSize: '0.9rem', color: '#9FE870', fontWeight: 700, lineHeight: 1.2 },
+  resolutionBody: { flex: 1, minWidth: 0 },
+  resolutionTitle: { fontSize: '0.68rem', fontWeight: 600, color: '#e8e8f0', letterSpacing: '0.02em' },
+  resolutionPartial: { fontSize: '0.58rem', color: '#ffaa00', fontWeight: 400 },
+  resolutionMeta: { fontSize: '0.56rem', color: '#8888a0', marginTop: 3, letterSpacing: '0.02em', fontFamily: 'ui-monospace, monospace' },
+
   chevron: { color: '#55556a', fontSize: '0.6rem' },
   msg: { padding: '0 14px 10px', fontSize: '0.72rem', color: '#8888a0', lineHeight: 1.5, wordBreak: 'break-word' },
 
