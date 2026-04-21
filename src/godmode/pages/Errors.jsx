@@ -276,6 +276,39 @@ export default function Errors() {
   const [expandedId, setExpandedId] = useState(null);
   const [copiedId, setCopiedId] = useState(null);
   const [view, setView] = useState('grouped'); // 'grouped' | 'raw'
+  // AI refinement state, keyed by group sig. { status: 'loading' | 'ok' | 'error', data?, err? }
+  const [aiBySig, setAiBySig] = useState({});
+
+  const refineWithAI = useCallback(async (sig, sample) => {
+    setAiBySig((prev) => ({ ...prev, [sig]: { status: 'loading' } }));
+    const frame = extractTopFrame(sample.error_stack);
+    try {
+      const resp = await fetch('/api/analyze-error', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          error_name: sample.error_name,
+          error_message: sample.error_message,
+          error_stack: sample.error_stack,
+          url: sample.url,
+          user_agent: sample.user_agent,
+          metadata: sample.metadata,
+          source: sample.source,
+          severity: sample.severity,
+          frame,
+          commit: APP_COMMIT,
+        }),
+      });
+      if (!resp.ok) {
+        const detail = await resp.json().catch(() => ({}));
+        throw new Error(detail.error || `HTTP ${resp.status}`);
+      }
+      const data = await resp.json();
+      setAiBySig((prev) => ({ ...prev, [sig]: { status: 'ok', data } }));
+    } catch (err) {
+      setAiBySig((prev) => ({ ...prev, [sig]: { status: 'error', err: String(err?.message || err) } }));
+    }
+  }, []);
 
   const fetchErrors = useCallback(async () => {
     setLoading(true);
@@ -452,27 +485,48 @@ export default function Errors() {
 
             <div style={st.msg}>{e.error_message || '(sem mensagem)'}</div>
 
-            {expanded && (
+            {expanded && (() => {
+              const aiState = aiBySig[g.sig];
+              const useAi = aiState?.status === 'ok';
+              const shown = useAi
+                ? { category: aiState.data.category, severity: aiState.data.severity, diagnosis: aiState.data.diagnosis, prompt: aiState.data.prompt }
+                : fix;
+              return (
               <div style={st.details}>
                 {/* AI Diagnosis */}
                 <div style={st.aiBox}>
                   <div style={st.aiHeader}>
-                    <span style={st.aiIcon}>🤖</span>
-                    <span style={st.aiTitle}>DIAGNOSTICO IA</span>
-                    <span style={{ ...st.aiBadge, background: fix.severity === 'high' ? 'rgba(255,68,102,0.15)' : fix.severity === 'info' ? 'rgba(0,229,255,0.15)' : 'rgba(255,170,0,0.15)', color: fix.severity === 'high' ? '#ff4466' : fix.severity === 'info' ? '#00e5ff' : '#ffaa00' }}>
-                      {fix.severity === 'high' ? 'URGENTE' : fix.severity === 'info' ? 'INFO' : 'MEDIO'}
+                    <span style={st.aiIcon}>{useAi ? '✨' : '🤖'}</span>
+                    <span style={st.aiTitle}>{useAi ? 'DIAGNOSTICO IA (CLAUDE)' : 'DIAGNOSTICO (PATTERN-MATCH)'}</span>
+                    <span style={{ ...st.aiBadge, background: shown.severity === 'high' ? 'rgba(255,68,102,0.15)' : shown.severity === 'info' ? 'rgba(0,229,255,0.15)' : 'rgba(255,170,0,0.15)', color: shown.severity === 'high' ? '#ff4466' : shown.severity === 'info' ? '#00e5ff' : '#ffaa00' }}>
+                      {shown.severity === 'high' ? 'URGENTE' : shown.severity === 'info' ? 'INFO' : shown.severity === 'low' ? 'BAIXO' : 'MEDIO'}
                     </span>
+                    <button
+                      style={{ ...st.refineBtn, ...(aiState?.status === 'loading' ? st.refineBtnLoading : {}) }}
+                      disabled={aiState?.status === 'loading'}
+                      onClick={() => refineWithAI(g.sig, e)}
+                    >
+                      {aiState?.status === 'loading' ? 'Analisando…' : useAi ? 'Reanalisar com IA' : 'Refinar com IA'}
+                    </button>
                   </div>
-                  <p style={st.aiDiagnosis}>{fix.diagnosis}</p>
+                  <p style={st.aiDiagnosis}>{shown.diagnosis}</p>
+
+                  {aiState?.status === 'error' && (
+                    <div style={st.aiError}>
+                      Falha ao chamar IA: {aiState.err}. Exibindo pattern-match como fallback.
+                    </div>
+                  )}
 
                   <div style={st.promptBox}>
                     <div style={st.promptHeader}>
-                      <span style={st.promptLabel}>PROMPT PARA CLAUDE CODE</span>
-                      <button style={st.copyBtn} onClick={() => copyPrompt(fix.prompt, g.sig)}>
+                      <span style={st.promptLabel}>
+                        PROMPT PARA CLAUDE CODE{useAi ? ' · REFINADO' : ''}
+                      </span>
+                      <button style={st.copyBtn} onClick={() => copyPrompt(shown.prompt, g.sig)}>
                         {copiedId === g.sig ? '✓ Copiado!' : 'Copiar'}
                       </button>
                     </div>
-                    <pre style={st.promptText}>{fix.prompt}</pre>
+                    <pre style={st.promptText}>{shown.prompt}</pre>
                   </div>
                 </div>
 
@@ -503,7 +557,8 @@ export default function Errors() {
                   </div>
                 )}
               </div>
-            )}
+              );
+            })()}
           </div>
         );
       })}
@@ -619,11 +674,35 @@ const st = {
   details: { padding: '0 14px 14px' },
 
   aiBox: { padding: 14, background: '#08081a', border: '1px solid rgba(0,229,255,0.1)', borderRadius: 8, marginBottom: 12 },
-  aiHeader: { display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 },
+  aiHeader: { display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, flexWrap: 'wrap' },
   aiIcon: { fontSize: '1rem' },
   aiTitle: { fontSize: '0.55rem', fontWeight: 700, letterSpacing: '0.2em', color: '#00e5ff' },
   aiBadge: { fontSize: '0.48rem', fontWeight: 700, padding: '2px 8px', borderRadius: 4, letterSpacing: '0.1em' },
   aiDiagnosis: { fontSize: '0.72rem', color: '#c8c8e0', lineHeight: 1.6, marginBottom: 10 },
+  refineBtn: {
+    marginLeft: 'auto',
+    padding: '5px 12px',
+    background: 'linear-gradient(90deg, rgba(0,229,255,0.12), rgba(167,123,255,0.12))',
+    border: '1px solid rgba(167,123,255,0.35)',
+    borderRadius: 6,
+    color: '#e8e8f0',
+    fontSize: '0.58rem',
+    letterSpacing: '0.06em',
+    fontWeight: 600,
+    cursor: 'pointer',
+    fontFamily: 'inherit',
+  },
+  refineBtnLoading: { opacity: 0.6, cursor: 'wait' },
+  aiError: {
+    fontSize: '0.6rem',
+    color: '#ffaa88',
+    background: 'rgba(255,68,102,0.08)',
+    border: '1px solid rgba(255,68,102,0.2)',
+    borderRadius: 4,
+    padding: '6px 8px',
+    marginBottom: 10,
+    letterSpacing: '0.02em',
+  },
 
   promptBox: { background: '#05050f', border: '1px solid #1a1a30', borderRadius: 6, overflow: 'hidden' },
   promptHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 10px', borderBottom: '1px solid #1a1a30' },
