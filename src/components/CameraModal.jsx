@@ -697,7 +697,14 @@ const s = {
     WebkitTapHighlightColor: 'transparent',
   },
   focusSurface: {
-    position: 'absolute', inset: 0, zIndex: 2,
+    // Tap-to-focus lives in the middle strip only — clears the top
+    // (close/torch) and bottom (shutter/flip/mode) so touch events
+    // never compete with real controls on Android/iOS.
+    position: 'absolute',
+    top: 'calc(72px + env(safe-area-inset-top, 0px))',
+    left: 0, right: 0,
+    bottom: 'calc(210px + env(safe-area-inset-bottom, 0px))',
+    zIndex: 2,
     background: 'transparent',
     pointerEvents: 'auto',
     WebkitTapHighlightColor: 'transparent',
