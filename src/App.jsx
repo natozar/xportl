@@ -326,6 +326,27 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [permissionsGranted, legalGatesCleared, ready]);
 
+  // ── Re-arm GPS / camera on reload when PermissionGate was bypassed ──
+  // `ready` is persisted in localStorage, so returning users skip PermissionGate
+  // entirely and `geo.request()` / `cam.request()` are never called for the new
+  // session — watchPosition never starts → lat/lng stay null → Radar stuck on
+  // "localizando" and scan is blocked by the null-coord guard. The browser still
+  // remembers the permission grant so the calls succeed without re-prompting.
+  const permsRearmedRef = useRef(false);
+  useEffect(() => {
+    if (!ready || permsRearmedRef.current) return;
+    permsRearmedRef.current = true;
+    if (!geo.granted && !geo.denied && !geo.loading) {
+      geo.request().catch(() => { /* state handles denial */ });
+    }
+    if (!cam.granted && !cam.denied && !cam.loading) {
+      cam.request();
+    }
+    // geo.request / cam.request are stable (useCallback([])) — deps kept minimal
+    // so the re-arm only fires on ready transitions, not every granted/denied flip.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready]);
+
   // ── Polling ──
   useEffect(() => {
     if (!ready) return;
