@@ -95,3 +95,7 @@ requestAnimationFrame(() => {
     setTimeout(() => shell.remove(), 800);
   });
 });
+
+// Real-user web-vitals. Dynamic import keeps it out of the critical path;
+// metrics stream to Supabase fire-and-forget so lab vs field can be compared.
+import('./services/webVitals').then(({ reportWebVitals }) => reportWebVitals());
