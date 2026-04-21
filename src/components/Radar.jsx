@@ -1,5 +1,7 @@
 
 export default function Radar({ lat, lng, accuracy, nearbyCount = 0, scanRadius = 50 }) {
+  const gpsReady = lat !== null && lat !== undefined && lng !== null && lng !== undefined;
+
   return (
     <div style={s.container}>
       {/* Radar circle */}
@@ -9,13 +11,15 @@ export default function Radar({ lat, lng, accuracy, nearbyCount = 0, scanRadius 
         <div style={s.sweep} />
         <div style={s.dot} />
 
-        {nearbyCount > 0 && <div style={{ ...s.blip, top: '22%', left: '62%' }} />}
-        {nearbyCount > 1 && <div style={{ ...s.blip, top: '58%', left: '28%' }} />}
-        {nearbyCount > 2 && <div style={{ ...s.blip, top: '38%', left: '72%' }} />}
+        {gpsReady && nearbyCount > 0 && <div style={{ ...s.blip, top: '22%', left: '62%' }} />}
+        {gpsReady && nearbyCount > 1 && <div style={{ ...s.blip, top: '58%', left: '28%' }} />}
+        {gpsReady && nearbyCount > 2 && <div style={{ ...s.blip, top: '38%', left: '72%' }} />}
       </div>
 
-      {/* Count */}
-      {nearbyCount > 0 ? (
+      {/* Count — or "localizando" while GPS is still resolving */}
+      {!gpsReady ? (
+        <span style={s.waiting}>localizando</span>
+      ) : nearbyCount > 0 ? (
         <div style={s.info}>
           <span style={s.count}>{nearbyCount}</span>
           <span style={s.label}>{nearbyCount === 1 ? 'sinal' : 'sinais'}</span>
@@ -24,8 +28,8 @@ export default function Radar({ lat, lng, accuracy, nearbyCount = 0, scanRadius 
         <span style={s.empty}>--</span>
       )}
 
-      {/* Coords + debug */}
-      {lat !== null && (
+      {/* Coords + debug (only once GPS resolves) */}
+      {gpsReady && (
         <div style={s.coords}>
           {lat.toFixed(5)}, {lng.toFixed(5)}
           {accuracy !== null && accuracy !== undefined && ` ±${accuracy.toFixed(0)}m`}
@@ -126,6 +130,14 @@ const s = {
     fontSize: '0.7rem',
     color: 'rgba(255,255,255,0.15)',
     letterSpacing: '0.1em',
+  },
+  waiting: {
+    fontSize: '0.55rem',
+    color: 'rgba(0, 255, 136, 0.55)',
+    letterSpacing: '0.18em',
+    textTransform: 'uppercase',
+    fontFamily: 'monospace',
+    animation: 'glitch-flicker 1.8s ease-in-out infinite',
   },
   coords: {
     fontSize: '0.42rem',
