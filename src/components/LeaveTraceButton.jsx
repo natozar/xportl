@@ -19,7 +19,7 @@ const VISIBILITY = [
 const RARITY_LIST = Object.values(RARITIES);
 const TYPE_LIST = Object.values(CAPSULE_TYPES);
 
-export default function LeaveTraceButton({ onPress, saving }) {
+export default function LeaveTraceButton({ onPress, saving, gpsReady = true }) {
   const [open, setOpen] = useState(false);
   const [feedback, setFeedback] = useState(null);
   const [step, setStep] = useState('compose'); // 'compose' | 'type'
@@ -303,6 +303,14 @@ export default function LeaveTraceButton({ onPress, saving }) {
                   )}
                 </div>
 
+                {/* GPS status hint — only when waiting */}
+                {!gpsReady && (
+                  <div style={st.gpsBar}>
+                    <div style={st.gpsDot} />
+                    <span>Buscando sinal GPS... publique em instantes.</span>
+                  </div>
+                )}
+
                 {/* Action bar */}
                 <div style={st.actionBar}>
                   <div style={st.mediaActions}>
@@ -346,11 +354,12 @@ export default function LeaveTraceButton({ onPress, saving }) {
                   <button
                     style={{
                       ...st.sendBtn,
-                      background: hasContent ? `linear-gradient(135deg, ${currentVis.color}, ${currentVis.color}cc)` : 'rgba(255,255,255,0.06)',
-                      color: hasContent ? '#0a0814' : 'rgba(255,255,255,0.2)',
+                      background: hasContent && gpsReady ? `linear-gradient(135deg, ${currentVis.color}, ${currentVis.color}cc)` : 'rgba(255,255,255,0.06)',
+                      color: hasContent && gpsReady ? '#0a0814' : 'rgba(255,255,255,0.2)',
                     }}
                     onClick={handleCreate}
-                    disabled={saving || (!hasContent)}
+                    disabled={saving || (!hasContent) || !gpsReady}
+                    title={!gpsReady ? 'Buscando sinal GPS...' : undefined}
                   >
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                       <line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" />
@@ -612,6 +621,17 @@ const st = {
   charCount: {
     position: 'absolute', bottom: 8, right: 12,
     fontSize: '0.5rem', color: 'rgba(255,255,255,0.2)', letterSpacing: '0.06em',
+  },
+  gpsBar: {
+    display: 'flex', alignItems: 'center', gap: 8,
+    padding: '8px 12px', marginBottom: 10, borderRadius: 10,
+    background: 'rgba(255,200,60,0.05)', border: '1px solid rgba(255,200,60,0.15)',
+    color: 'rgba(255,200,60,0.8)', fontSize: '0.65rem', fontWeight: 600, letterSpacing: '0.02em',
+  },
+  gpsDot: {
+    width: 8, height: 8, borderRadius: '50%', background: '#ffc83c',
+    boxShadow: '0 0 8px #ffc83c', animation: 'pulse 1.4s ease-in-out infinite',
+    flexShrink: 0,
   },
   actionBar: { display: 'flex', alignItems: 'center', gap: 10 },
   mediaActions: { flex: 1, display: 'flex', alignItems: 'center', gap: 4 },

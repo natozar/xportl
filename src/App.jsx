@@ -104,6 +104,9 @@ export default function App() {
 
   // Synchronous lock to prevent double-tap race condition on capsule creation
   const savingLockRef = useRef(false);
+  // Ref mirror of geo so closures (handleLeaveTrace) can poll latest GPS state
+  // without stale-closure bugs. Updated on every geo change below.
+  const geoRef = useRef(null);
   // ready is persisted in localStorage — survives re-renders, React strict mode,
   // TOKEN_REFRESHED, profile refetches, and any other state fluctuation.
   // Only a full page reload or logout clears it.
@@ -433,11 +436,49 @@ export default function App() {
     return unsubscribe;
   }, [ready, geo.lat, geo.lng]);
 
+  // Keep ref in sync with geo state so closures can read latest values
+  useEffect(() => { geoRef.current = geo; }, [geo]);
+
+  // Wait for a GPS fix up to timeoutMs (polls the ref every 400ms).
+  // Returns the geo snapshot once lat is non-null, or null on timeout.
+  const waitForGpsFix = useCallback(async (timeoutMs = 8000) => {
+    const start = Date.now();
+    while (Date.now() - start < timeoutMs) {
+      const g = geoRef.current;
+      if (g && g.lat !== null && g.lng !== null) return g;
+      await new Promise((r) => setTimeout(r, 400));
+    }
+    return null;
+  }, []);
+
   // ── Leave Trace (with all compliance checks) ──
   const handleLeaveTrace = useCallback(async ({ unlockDate, message, mediaBlob, mediaType, viewsLeft, visibilityLayer, rarity, capsuleType, headingDeg, pitchDeg, hintPhotoBlob }) => {
-    if (savingLockRef.current || geo.lat === null || !session?.user?.id) {
-      if (geo.lat === null) alert('Aguardando sinal GPS... Tente novamente em instantes.');
-      return;
+    if (savingLockRef.current || !session?.user?.id) return;
+
+    // GPS guard with retry: if no fix yet, wait up to 8s for the watch to deliver one
+    // instead of immediately bouncing the user. Logs full state for field debugging.
+    let g = geoRef.current || geo;
+    if (!g || g.lat === null || g.lng === null) {
+      console.warn('[XPortl Publish] No GPS fix at publish time — waiting up to 8s', {
+        granted: g?.granted, denied: g?.denied, error: g?.error, accuracy: g?.accuracy,
+      });
+      g = await waitForGpsFix(8000);
+      if (!g) {
+        const last = geoRef.current;
+        console.error('[XPortl Publish] GPS timeout — publication blocked', {
+          granted: last?.granted, denied: last?.denied, error: last?.error,
+        });
+        if (last?.denied) {
+          alert('Localização negada. Ative a localização nas configurações do navegador e tente novamente.');
+        } else {
+          alert('Sem sinal GPS após 8s. Saia para uma área mais aberta ou tente novamente em instantes.');
+        }
+        return;
+      }
+      console.log('[XPortl Publish] GPS acquired after retry:', { lat: g.lat, lng: g.lng, accuracy: g.accuracy });
+    }
+    if (g.lowAccuracy) {
+      console.warn(`[XPortl Publish] Publishing with low-accuracy fix: ±${g.accuracy?.toFixed(0)}m`);
     }
     savingLockRef.current = true;
 
@@ -459,7 +500,7 @@ export default function App() {
     // Geofence check (fail-open on timeout)
     try {
       const zone = await safeCheck(
-        () => checkRestrictedZone(geo.lat, geo.lng),
+        () => checkRestrictedZone(g.lat, g.lng),
         null
       );
       if (zone) { alert(`Zona restrita (${zone.zone_name}). Capsulas nao podem ser criadas neste local.`); return; }
@@ -499,11 +540,11 @@ export default function App() {
       }
 
       // Place capsule at user's exact GPS coordinates.
-      const plant = smartPlaceCoord(geo.lat, geo.lng, geo.accuracy, getHeading());
+      const plant = smartPlaceCoord(g.lat, g.lng, g.accuracy, getHeading());
       await createCapsule({
         lat: plant.lat,
         lng: plant.lng,
-        altitude: geo.altitude,
+        altitude: g.altitude,
         content: { type: 'text', body },
         visibility_layer: visibilityLayer || 'public',
         unlock_date: unlockDate,
@@ -528,7 +569,7 @@ export default function App() {
       });
 
       // Log access (Marco Civil Art. 15) — fire-and-forget
-      logAccess({ userId: session.user.id, action: 'create_capsule', lat: geo.lat, lng: geo.lng }).catch(() => {});
+      logAccess({ userId: session.user.id, action: 'create_capsule', lat: g.lat, lng: g.lng }).catch(() => {});
 
       // Award XP (non-blocking — capsule is already saved, don't let XP failure break the flow)
       try {
@@ -543,7 +584,7 @@ export default function App() {
       }
 
       setScanVersion((v) => v + 1);
-      const results = await getNearbyCapsules(geo.lat, geo.lng, SCAN_RADIUS);
+      const results = await getNearbyCapsules(g.lat, g.lng, SCAN_RADIUS);
       setNearbyCapsules(results.filter((c) => !c.moderation_status || c.moderation_status === 'active'));
       setLastScan(new Date().toLocaleTimeString('pt-BR'));
     } catch (err) {
@@ -561,8 +602,8 @@ export default function App() {
         error_stack: err?.stack || null,
         severity: 'error',
         metadata: {
-          lat: geo.lat,
-          lng: geo.lng,
+          lat: g?.lat ?? null,
+          lng: g?.lng ?? null,
           visibility_layer: visibilityLayer || 'public',
           has_media: !!mediaBlob,
           media_type: mediaType || null,
@@ -579,7 +620,7 @@ export default function App() {
       setSaving(false);
       savingLockRef.current = false;
     }
-  }, [geo.lat, geo.lng, geo.altitude, geo.accuracy, session, profile, getHeading]);
+  }, [geo, session, profile, getHeading, waitForGpsFix]);
 
   // ── Quick Ping ──
   const handleVibePing = useCallback(async (emoji) => {
@@ -768,7 +809,7 @@ export default function App() {
 
           <div style={styles.overlay}>
             <Radar lat={geo.lat} lng={geo.lng} accuracy={geo.accuracy} nearbyCount={nearbyCapsules.length} scanRadius={SCAN_RADIUS} />
-            <LeaveTraceButton onPress={handleLeaveTrace} saving={saving} />
+            <LeaveTraceButton onPress={handleLeaveTrace} saving={saving} gpsReady={geo.lat !== null && geo.lng !== null} />
             <VibePing onPing={handleVibePing} />
           </div>
         </>
