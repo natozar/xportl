@@ -33,6 +33,8 @@
 <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
 <meta name="googlebot" content="index, follow, max-image-preview:large" />
 <link rel="canonical" href="https://xportl.com/" />
+<link rel="alternate" hreflang="pt-BR" href="https://xportl.com/" />
+<link rel="alternate" hreflang="x-default" href="https://xportl.com/" />
 
 <!-- ─ Open Graph (WhatsApp, Telegram, Discord, Facebook, LinkedIn) ─ -->
 <meta property="og:site_name" content="XPortl" />
@@ -106,6 +108,61 @@
         "Moderação NSFW no dispositivo",
         "PWA instalável"
       ]
+    },
+    {
+      "@type": "FAQPage",
+      "@id": "https://xportl.com/#faq",
+      "inLanguage": "pt-BR",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "Precisa baixar algo?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Não. XPortl roda como PWA (progressive web app). Você abre no navegador do celular e, se quiser, adiciona à tela inicial com um toque. Nenhuma loja envolvida."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Funciona em iPhone e Android?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Sim. Testado em iPhone do SE ao 15 Pro, e Android do médio ao Galaxy S25 Ultra. O único requisito é um navegador moderno (Safari 15+, Chrome 100+)."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Como a localização funciona?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Usamos GPS do seu próprio aparelho. A precisão típica ao ar livre é de 3 a 10 metros; indoors pode chegar a 30 a 80 metros. Cápsulas só aparecem quando você está dentro do raio configurado por quem a deixou."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "E se alguém deixar algo inapropriado?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Todo upload passa por um modelo NSFW rodando no seu próprio navegador antes de sair. Conteúdo pode ser reportado por qualquer usuário — material sinalizado é removido automaticamente e revisado."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Quanto custa?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Gratuito durante o early access. Planos premium (maior alcance, persistência estendida, analytics para criadores) ficam para depois, uma vez que a base de cápsulas estiver saudável."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Posso usar a API?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Em breve. Estamos desenhando integrações para criadores — eventos, rotas turísticas, ARGs — após o lançamento aberto."
+          }
+        }
+      ]
     }
   ]
 }
@@ -113,7 +170,10 @@
 
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<!-- Preload hero font CSS separately so LCP (italic serif headline) ships sooner -->
+<link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&display=swap" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&display=swap" fetchpriority="high" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
 
 <style>
   :root {
