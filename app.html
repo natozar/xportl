@@ -7,8 +7,9 @@
     <meta name="description" content="XPortl - A Realidade Aumentada de Capsulas do Tempo" />
 
     <!-- Security headers -->
-    <meta http-equiv="X-Content-Type-Options" content="nosniff" />
-    <meta http-equiv="X-Frame-Options" content="DENY" />
+    <!-- X-Frame-Options and X-Content-Type-Options are set as HTTP headers in
+         vercel.json; browsers now hard-reject these when set via <meta>. Only
+         referrer can be configured here. -->
     <meta name="referrer" content="strict-origin-when-cross-origin" />
 
     <!-- PWA: Android / General capable -->
