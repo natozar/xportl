@@ -18,6 +18,7 @@ import NearbyOverlay from './components/NearbyOverlay';
 import MapView from './components/MapView';
 import IndoorScene from './components/IndoorScene';
 import ProfilePage from './components/ProfilePage';
+import MyCapsulesPage from './components/MyCapsulesPage';
 import SettingsPage from './components/SettingsPage';
 import NotificationsPage from './components/NotificationsPage';
 import VisualMatcher from './components/VisualMatcher';
@@ -123,6 +124,7 @@ export default function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [xpEvent, setXpEvent] = useState(null);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
+  const [showMyCapsules, setShowMyCapsules] = useState(false);
   const [unreadNotifs, setUnreadNotifs] = useState(0);
   const [showPortalAnimation, setShowPortalAnimation] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
@@ -882,13 +884,22 @@ export default function App() {
       )}
 
       {/* ── Tab: Profile ── */}
-      {activeTab === 'profile' && !showSettings && (
+      {activeTab === 'profile' && !showSettings && !showMyCapsules && (
         <ProfilePage
           session={session}
           profile={profile}
           onOpenSettings={() => setShowSettings(true)}
           onRefreshProfile={refreshProfile}
           onOpenLeaderboard={() => setShowLeaderboard(true)}
+          onOpenMyCapsules={() => setShowMyCapsules(true)}
+        />
+      )}
+
+      {showMyCapsules && (
+        <MyCapsulesPage
+          session={session}
+          onBack={() => setShowMyCapsules(false)}
+          onRefreshProfile={refreshProfile}
         />
       )}
 

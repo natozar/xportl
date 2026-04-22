@@ -4,7 +4,7 @@ import { supabase } from '../services/supabase';
 import { xpProgress, getLevelTitle, BADGES } from '../services/gamification';
 import { RARITIES } from '../services/capsules';
 
-export default function ProfilePage({ session, profile, onOpenSettings, onRefreshProfile, onOpenLeaderboard }) {
+export default function ProfilePage({ session, profile, onOpenSettings, onRefreshProfile, onOpenLeaderboard, onOpenMyCapsules }) {
   const [editingName, setEditingName] = useState(false);
   const [name, setName] = useState(profile?.display_name || '');
   const [saving, setSaving] = useState(false);
@@ -217,6 +217,14 @@ export default function ProfilePage({ session, profile, onOpenSettings, onRefres
                 );
               })}
             </div>
+            {onOpenMyCapsules && capsuleStats.total > 0 && (
+              <button style={s.manageBtn} onClick={onOpenMyCapsules}>
+                Gerenciar portais e ver interacoes
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" style={{ marginLeft: 'auto', opacity: 0.4 }}>
+                  <path d="M9 6l6 6-6 6" stroke="currentColor" strokeWidth="1.5" />
+                </svg>
+              </button>
+            )}
           </div>
         )}
 
@@ -403,6 +411,13 @@ const s = {
   },
   rarityStatCount: { fontSize: '0.75rem', fontWeight: 700 },
   rarityStatName: { fontSize: '0.5rem', color: 'rgba(255,255,255,0.25)', fontWeight: 600 },
+  manageBtn: {
+    marginTop: 12, width: '100%', display: 'flex', alignItems: 'center',
+    padding: '10px 12px', borderRadius: 10,
+    background: 'rgba(0,240,255,0.04)', border: '1px solid rgba(0,240,255,0.12)',
+    color: '#00f0ff', fontSize: '0.7rem', fontWeight: 600, fontFamily: 'inherit',
+    letterSpacing: '0.04em',
+  },
 
   // ── Stats ──
   statsGrid: {
