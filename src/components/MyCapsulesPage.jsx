@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '../services/supabase';
 import { selfDestruct, getRarity, getCapsuleType, isCapsuleLocked, getTimeRemaining } from '../services/capsules';
+import { trackEvent } from '../services/events';
 
 /**
  * MyCapsulesPage — full-screen list of the user's own capsules.
@@ -115,11 +116,26 @@ export default function MyCapsulesPage({ session, onBack, onRefreshProfile }) {
     loadInteractors(id);
   };
 
+  const handleShare = async (id) => {
+    const url = `${window.location.origin}/p/${id}`;
+    trackEvent('portal_shared', { capsule_id: id });
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: 'Meu portal no XPortl', url });
+        return;
+      }
+    } catch { /* user cancelled or API unavailable — fall through to clipboard */ }
+    try {
+      await navigator.clipboard.writeText(url);
+    } catch { /* clipboard blocked — do nothing, user can copy manually from the URL we'll show */ }
+  };
+
   const handleDelete = async (id) => {
     if (deleting[id]) return;
     setDeleting((s) => ({ ...s, [id]: true }));
     try {
       await selfDestruct(id);
+      trackEvent('capsule_deleted', { capsule_id: id });
       setItems((prev) => (prev || []).filter((c) => c.id !== id));
       if (onRefreshProfile) onRefreshProfile();
     } catch (err) {
@@ -217,6 +233,11 @@ export default function MyCapsulesPage({ session, onBack, onRefreshProfile }) {
                   ))}
 
                   <div style={s.actionsRow}>
+                    {!isConfirming && (
+                      <button style={s.shareBtn} onClick={() => handleShare(c.id)}>
+                        Compartilhar link
+                      </button>
+                    )}
                     {!isConfirming && (
                       <button style={s.deleteBtn} onClick={() => setConfirmId(c.id)} disabled={isDeleting}>
                         Apagar portal
@@ -393,7 +414,13 @@ const s = {
     whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
   },
   interactorKinds: { fontSize: '0.55rem', color: 'rgba(255,255,255,0.4)' },
-  actionsRow: { marginTop: 12, display: 'flex', justifyContent: 'flex-end' },
+  actionsRow: { marginTop: 12, display: 'flex', justifyContent: 'flex-end', gap: 8, flexWrap: 'wrap' },
+  shareBtn: {
+    padding: '8px 14px', borderRadius: 10,
+    background: 'rgba(0,240,255,0.08)', border: '1px solid rgba(0,240,255,0.25)',
+    color: '#00f0ff', fontSize: '0.68rem', fontWeight: 600,
+    fontFamily: 'inherit', letterSpacing: '0.06em',
+  },
   deleteBtn: {
     padding: '8px 14px', borderRadius: 10,
     background: 'rgba(255,68,102,0.08)', border: '1px solid rgba(255,68,102,0.25)',

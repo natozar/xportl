@@ -36,6 +36,7 @@ import { usePwaInstall } from './hooks/usePwaInstall';
 import { useCompassHeading } from './hooks/useCompassHeading';
 import { useWakeLock } from './hooks/useWakeLock';
 import { createCapsule, getNearbyCapsules, subscribeToCapsuleChanges, haversineDistance } from './services/capsules';
+import { trackEvent } from './services/events';
 import { createPing } from './services/pings';
 import { clusterCapsules } from './services/clustering';
 import { decodeShareToken } from './services/share';
@@ -147,6 +148,11 @@ export default function App() {
       if (cap) setFoundAnimCapsule(cap);
     }
   }, [hunt.arrivedAt, nearbyCapsules, foundAnimCapsule]);
+
+  // Fire a single app_open event per session for the activation funnel.
+  useEffect(() => { trackEvent('app_open'); }, []);
+  // my_capsules_opened is de-duped per session inside trackEvent.
+  useEffect(() => { if (showMyCapsules) trackEvent('my_capsules_opened'); }, [showMyCapsules]);
 
   // ── Auth listener ──
   useEffect(() => {
@@ -583,6 +589,14 @@ export default function App() {
         heading_deg: headingDeg ?? null,
         pitch_deg: pitchDeg ?? null,
         hint_photo_url: hintPhotoUrl,
+      });
+
+      trackEvent('capsule_created', {
+        rarity: rarity || 'common',
+        capsule_type: capsuleType || 'standard',
+        has_media: !!mediaUrl,
+        visibility: visibilityLayer || 'public',
+        has_unlock_date: !!unlockDate,
       });
 
       // Trigger "O PORTAL SE ANCORA" 2.8s cinematic — fires on successful INSERT only.

@@ -5,7 +5,10 @@
     { "source": "/app", "destination": "/app.html" },
     { "source": "/app/:path*", "destination": "/app.html" },
     { "source": "/godmode", "destination": "/godmode.html" },
-    { "source": "/godmode/:path*", "destination": "/godmode.html" }
+    { "source": "/godmode/:path*", "destination": "/godmode.html" },
+    { "source": "/p/:id", "destination": "/api/p?id=:id" },
+    { "source": "/termos", "destination": "/termos.html" },
+    { "source": "/privacidade", "destination": "/privacidade.html" }
   ],
   "headers": [
     {

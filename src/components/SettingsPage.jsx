@@ -71,8 +71,8 @@ export default function SettingsPage({ session, onBack }) {
         {/* Legal section */}
         <div style={s.sectionLabel}>LEGAL</div>
         <div style={s.group}>
-          <LinkItem label="Termos de Uso" href="/TERMOS_DE_USO.md" />
-          <LinkItem label="Politica de Privacidade" href="/POLITICA_DE_PRIVACIDADE.md" />
+          <LinkItem label="Termos de Uso" href="/termos" />
+          <LinkItem label="Politica de Privacidade" href="/privacidade" />
         </div>
 
         {/* LGPD section */}
