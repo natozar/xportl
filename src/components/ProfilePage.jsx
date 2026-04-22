@@ -3,6 +3,7 @@ import { updateDisplayName } from '../services/auth';
 import { supabase } from '../services/supabase';
 import { xpProgress, getLevelTitle, BADGES } from '../services/gamification';
 import { RARITIES } from '../services/capsules';
+import { countFriends } from '../services/friendships';
 
 export default function ProfilePage({ session, profile, onOpenSettings, onRefreshProfile, onOpenLeaderboard, onOpenMyCapsules }) {
   const [editingName, setEditingName] = useState(false);
@@ -10,6 +11,7 @@ export default function ProfilePage({ session, profile, onOpenSettings, onRefres
   const [saving, setSaving] = useState(false);
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [capsuleStats, setCapsuleStats] = useState(null);
+  const [friendsCount, setFriendsCount] = useState(null);
   const fileRef = useRef(null);
 
   // Load capsule stats
@@ -39,6 +41,10 @@ export default function ProfilePage({ session, profile, onOpenSettings, onRefres
         byRarity,
         discovered: discovered || 0,
       });
+
+      // Fire-and-forget — if the friendships migration isn't applied
+      // yet the count just stays null and the UI hides that stat.
+      countFriends().then((n) => setFriendsCount(n)).catch(() => {});
     })();
   }, [session?.user?.id]);
 
@@ -203,6 +209,12 @@ export default function ProfilePage({ session, profile, onOpenSettings, onRefres
                 <span style={s.capsuleStatNum}>{capsuleStats.discovered}</span>
                 <span style={s.capsuleStatLabel}>descobertos</span>
               </div>
+              {friendsCount !== null && (
+                <div style={s.capsuleStatMain}>
+                  <span style={{ ...s.capsuleStatNum, color: '#9FE870' }}>{friendsCount}</span>
+                  <span style={s.capsuleStatLabel}>amigos</span>
+                </div>
+              )}
             </div>
             <div style={s.rarityBreakdown}>
               {Object.entries(capsuleStats.byRarity).map(([key, count]) => {

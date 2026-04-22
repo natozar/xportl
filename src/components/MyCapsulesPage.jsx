@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '../services/supabase';
 import { selfDestruct, getRarity, getCapsuleType, isCapsuleLocked, getTimeRemaining } from '../services/capsules';
 import { trackEvent } from '../services/events';
+import { getFriendshipStates, sendFriendRequest, acceptFriendRequest } from '../services/friendships';
 
 /**
  * MyCapsulesPage — full-screen list of the user's own capsules.
@@ -20,6 +21,9 @@ export default function MyCapsulesPage({ session, onBack, onRefreshProfile }) {
   const [loadingInteractors, setLoadingInteractors] = useState({});
   const [deleting, setDeleting] = useState({});
   const [confirmId, setConfirmId] = useState(null);
+  // userId -> 'none' | 'pending_sent' | 'pending_received' | 'friends'
+  const [friendStates, setFriendStates] = useState({});
+  const [friendActionId, setFriendActionId] = useState(null);
 
   const uid = session?.user?.id;
 
@@ -105,7 +109,19 @@ export default function MyCapsulesPage({ session, onBack, onRefreshProfile }) {
 
     setInteractors((s) => ({ ...s, [capsuleId]: list }));
     setLoadingInteractors((s) => ({ ...s, [capsuleId]: false }));
-  }, [interactors, loadingInteractors, uid]);
+
+    // Hydrate friendship states for the interactors we haven't seen yet.
+    const needed = list.map((i) => i.userId).filter((id) => !(id in friendStates));
+    if (needed.length > 0) {
+      getFriendshipStates(needed).then((m) => {
+        setFriendStates((prev) => {
+          const next = { ...prev };
+          for (const [id, st] of m.entries()) next[id] = st;
+          return next;
+        });
+      }).catch(() => {});
+    }
+  }, [interactors, loadingInteractors, uid, friendStates]);
 
   const handleToggle = (id) => {
     if (expandedId === id) {
@@ -114,6 +130,31 @@ export default function MyCapsulesPage({ session, onBack, onRefreshProfile }) {
     }
     setExpandedId(id);
     loadInteractors(id);
+  };
+
+  const handleFriendAction = async (otherUserId) => {
+    if (friendActionId) return;
+    setFriendActionId(otherUserId);
+    const state = friendStates[otherUserId] || 'none';
+    try {
+      if (state === 'none') {
+        const r = await sendFriendRequest(otherUserId);
+        if (r.ok) {
+          setFriendStates((s) => ({ ...s, [otherUserId]: r.reason === 'accepted' ? 'friends' : 'pending_sent' }));
+          trackEvent('friend_request_sent', { to: otherUserId });
+        }
+      } else if (state === 'pending_received') {
+        const r = await acceptFriendRequest(otherUserId);
+        if (r.ok) {
+          setFriendStates((s) => ({ ...s, [otherUserId]: 'friends' }));
+          trackEvent('friend_request_accepted', { from: otherUserId });
+        }
+      }
+      // pending_sent and friends are terminal from this screen — no action.
+    } catch (err) {
+      console.error('[XPortl MyCapsules] friend action failed:', err);
+    }
+    setFriendActionId(null);
   };
 
   const handleShare = async (id) => {
@@ -218,19 +259,24 @@ export default function MyCapsulesPage({ session, onBack, onRefreshProfile }) {
                   {!loadingList && list?.length === 0 && (
                     <div style={s.muted}>Ninguem interagiu ainda. Compartilhe o link pra atrair portal walkers.</div>
                   )}
-                  {!loadingList && list?.map((i) => (
-                    <div key={i.userId} style={s.interactor}>
-                      {i.avatarUrl ? (
-                        <img src={i.avatarUrl} alt="" style={s.avatar} />
-                      ) : (
-                        <div style={s.avatarFallback}>{(i.displayName || '?')[0].toUpperCase()}</div>
-                      )}
-                      <div style={s.interactorMeta}>
-                        <span style={s.interactorName}>{i.displayName || 'Portal Walker'}</span>
-                        <span style={s.interactorKinds}>{humanizeKinds(i.kinds)} · {formatDate(i.latestAt)}</span>
+                  {!loadingList && list?.map((i) => {
+                    const st = friendStates[i.userId] || 'none';
+                    const busy = friendActionId === i.userId;
+                    return (
+                      <div key={i.userId} style={s.interactor}>
+                        {i.avatarUrl ? (
+                          <img src={i.avatarUrl} alt="" style={s.avatar} />
+                        ) : (
+                          <div style={s.avatarFallback}>{(i.displayName || '?')[0].toUpperCase()}</div>
+                        )}
+                        <div style={s.interactorMeta}>
+                          <span style={s.interactorName}>{i.displayName || 'Portal Walker'}</span>
+                          <span style={s.interactorKinds}>{humanizeKinds(i.kinds)} · {formatDate(i.latestAt)}</span>
+                        </div>
+                        <FriendBtn state={st} busy={busy} onClick={() => handleFriendAction(i.userId)} />
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
 
                   <div style={s.actionsRow}>
                     {!isConfirming && (
@@ -262,6 +308,26 @@ export default function MyCapsulesPage({ session, onBack, onRefreshProfile }) {
         })}
       </div>
     </div>
+  );
+}
+
+function FriendBtn({ state, busy, onClick }) {
+  const map = {
+    none:             { label: 'Adicionar',     style: s.friendBtnPrimary,  active: true  },
+    pending_sent:     { label: 'Pendente',      style: s.friendBtnMuted,    active: false },
+    pending_received: { label: 'Aceitar',       style: s.friendBtnAccent,   active: true  },
+    friends:          { label: 'Amigos',        style: s.friendBtnSuccess,  active: false },
+  };
+  const m = map[state] || map.none;
+  return (
+    <button
+      style={{ ...s.friendBtnBase, ...m.style, ...(busy ? s.friendBtnBusy : {}) }}
+      onClick={m.active ? onClick : undefined}
+      disabled={!m.active || busy}
+      aria-label={m.label}
+    >
+      {busy ? '...' : m.label}
+    </button>
   );
 }
 
@@ -414,6 +480,17 @@ const s = {
     whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
   },
   interactorKinds: { fontSize: '0.55rem', color: 'rgba(255,255,255,0.4)' },
+  friendBtnBase: {
+    marginLeft: 'auto', padding: '5px 10px', borderRadius: 999,
+    fontSize: '0.56rem', fontWeight: 700, letterSpacing: '0.08em',
+    textTransform: 'uppercase', fontFamily: 'inherit', whiteSpace: 'nowrap',
+    border: '1px solid', cursor: 'pointer',
+  },
+  friendBtnPrimary: { color: '#00f0ff', borderColor: 'rgba(0,240,255,0.3)', background: 'rgba(0,240,255,0.08)' },
+  friendBtnAccent:  { color: '#0a0a14', borderColor: '#00e5ff',               background: '#00e5ff' },
+  friendBtnMuted:   { color: 'rgba(255,255,255,0.4)', borderColor: 'rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.02)' },
+  friendBtnSuccess: { color: '#9FE870', borderColor: 'rgba(159,232,112,0.25)', background: 'rgba(159,232,112,0.06)' },
+  friendBtnBusy:    { opacity: 0.6, cursor: 'wait' },
   actionsRow: { marginTop: 12, display: 'flex', justifyContent: 'flex-end', gap: 8, flexWrap: 'wrap' },
   shareBtn: {
     padding: '8px 14px', borderRadius: 10,
