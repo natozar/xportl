@@ -27,3 +27,4 @@ npm-debug.log*
 
 # Internal Claude Code prompts (not for public repo)
 CODE_PROMPT*.md
+.vercel
