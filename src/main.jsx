@@ -70,8 +70,33 @@ const reportError = (payload) => {
     .catch(() => { /* supabase unavailable — swallow */ });
 };
 
+// Third-party CDN origins whose errors are not actionable from our code.
+// AR.js in particular fires "AxiosError: Network Error" on flaky marker/NFT
+// fetches we don't even use (we only consume gps-camera + gps-entity-place).
+// Reporting these just spams the godmode with noise we can't fix.
+const THIRD_PARTY_ORIGINS = [
+  'aframe.io',
+  'unpkg.com',
+  'cdn.jsdelivr.net',
+  'raw.githack.com',
+];
+const THIRD_PARTY_NOISE_PATTERNS = [
+  /AxiosError:\s*Network Error/i,
+  /AR\.js/i,
+  /aframe-ar/i,
+  /ScriptError\.?$/i, // cross-origin bare "Script error." with no stack
+];
+
+function isThirdPartyNoise({ message, filename, stack }) {
+  const hay = `${message || ''}\n${filename || ''}\n${stack || ''}`;
+  if (THIRD_PARTY_ORIGINS.some((o) => hay.includes(o))) return true;
+  if (THIRD_PARTY_NOISE_PATTERNS.some((re) => re.test(hay))) return true;
+  return false;
+}
+
 window.addEventListener('error', (event) => {
   console.error('[XPortl] Global error:', event.message);
+  if (isThirdPartyNoise({ message: event.message, filename: event.filename, stack: event.error?.stack })) return;
   reportError({
     source: 'client',
     error_name: 'JS_ERROR',
@@ -86,11 +111,15 @@ window.addEventListener('error', (event) => {
 
 window.addEventListener('unhandledrejection', (event) => {
   console.error('[XPortl] Unhandled rejection:', event.reason);
+  const reason = event.reason;
+  const message = String(reason?.message || reason);
+  const stack = reason?.stack || null;
+  if (isThirdPartyNoise({ message, stack })) { event.preventDefault(); return; }
   reportError({
     source: 'client',
     error_name: 'UNHANDLED_REJECTION',
-    error_message: String(event.reason),
-    error_stack: event.reason?.stack || null,
+    error_message: message,
+    error_stack: stack,
     url: window.location.href,
     user_agent: navigator.userAgent,
     severity: 'error',
