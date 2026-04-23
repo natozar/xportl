@@ -20,18 +20,33 @@ export function generateShareLink(capsule) {
 }
 
 /**
- * Decode a share token from the URL hash
- * Returns { id, lat, lng } or null
+ * Decode a share token from the URL hash (hash form: `#capsule=<base64>`),
+ * OR a plain capsule id from the query string (query form: `?capsule=<uuid>`).
+ *
+ * The query form is what `/p/:id` share previews generate — no lat/lng,
+ * just the id. App.jsx fetches the capsule row by id and computes distance
+ * opportunistically at open time, so lat/lng aren't actually required here.
+ *
+ * Returns { id, lat?, lng? } or null.
  */
 export function decodeShareToken() {
+  // 1) Hash token form — legacy share link with embedded coords.
   const hash = window.location.hash;
-  if (!hash.includes('capsule=')) return null;
+  if (hash.includes('capsule=')) {
+    try {
+      const token = hash.split('capsule=')[1];
+      const payload = JSON.parse(atob(token));
+      if (payload.id && payload.lat && payload.lng) return payload;
+    } catch (_e) { /* fall through to query-param form */ }
+  }
 
-  try {
-    const token = hash.split('capsule=')[1];
-    const payload = JSON.parse(atob(token));
-    if (payload.id && payload.lat && payload.lng) return payload;
-  } catch (_e) { /* ignore */ }
+  // 2) Query-param form — lean preview CTA from /p/:id.
+  const qs = new URLSearchParams(window.location.search);
+  const qid = qs.get('capsule');
+  // Basic UUID shape sanity check (don't trust crawlers).
+  if (qid && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(qid)) {
+    return { id: qid };
+  }
 
   return null;
 }

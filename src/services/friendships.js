@@ -85,16 +85,24 @@ export async function acceptFriendRequest(fromUserId) {
   const me = sess?.session?.user?.id;
   if (!me || !fromUserId) return { ok: false, reason: 'invalid' };
 
-  const { error } = await supabase
+  // `.select()` returns the updated rows so we can verify the UPDATE actually
+  // matched. Without this, a request that was deleted (or never existed) would
+  // succeed silently and leave the UI in a lying "friends" state.
+  const { data, error } = await supabase
     .from('friendships')
     .update({ status: 'accepted' })
     .eq('from_id', fromUserId)
     .eq('to_id', me)
-    .eq('status', 'pending');
+    .eq('status', 'pending')
+    .select('from_id');
 
   if (error) {
     console.warn('[XPortl Friendships] acceptFriendRequest failed:', error.message);
     return { ok: false, reason: 'db_error', detail: error.message };
+  }
+  if (!data || data.length === 0) {
+    // Nothing to accept — request was cancelled, already accepted, or never sent.
+    return { ok: false, reason: 'no_pending_request' };
   }
 
   createNotification({

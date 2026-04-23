@@ -32,6 +32,7 @@ export default [
         CustomEvent: 'readonly',
         fetch: 'readonly',
         URL: 'readonly',
+        URLSearchParams: 'readonly',
         Blob: 'readonly',
         File: 'readonly',
         Image: 'readonly',

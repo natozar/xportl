@@ -24,6 +24,8 @@ export default function MyCapsulesPage({ session, onBack, onRefreshProfile }) {
   // userId -> 'none' | 'pending_sent' | 'pending_received' | 'friends'
   const [friendStates, setFriendStates] = useState({});
   const [friendActionId, setFriendActionId] = useState(null);
+  // userId -> short error label shown next to the row when the action fails.
+  const [friendErrors, setFriendErrors] = useState({});
 
   const uid = session?.user?.id;
 
@@ -135,16 +137,19 @@ export default function MyCapsulesPage({ session, onBack, onRefreshProfile }) {
   const handleFriendAction = async (otherUserId) => {
     if (friendActionId) return;
     setFriendActionId(otherUserId);
+    // Clear any prior error for this user before trying again.
+    setFriendErrors((e) => { if (!e[otherUserId]) return e; const n = { ...e }; delete n[otherUserId]; return n; });
     const state = friendStates[otherUserId] || 'none';
+    let r = null;
     try {
       if (state === 'none') {
-        const r = await sendFriendRequest(otherUserId);
+        r = await sendFriendRequest(otherUserId);
         if (r.ok) {
           setFriendStates((s) => ({ ...s, [otherUserId]: r.reason === 'accepted' ? 'friends' : 'pending_sent' }));
           trackEvent('friend_request_sent', { to: otherUserId });
         }
       } else if (state === 'pending_received') {
-        const r = await acceptFriendRequest(otherUserId);
+        r = await acceptFriendRequest(otherUserId);
         if (r.ok) {
           setFriendStates((s) => ({ ...s, [otherUserId]: 'friends' }));
           trackEvent('friend_request_accepted', { from: otherUserId });
@@ -153,6 +158,17 @@ export default function MyCapsulesPage({ session, onBack, onRefreshProfile }) {
       // pending_sent and friends are terminal from this screen — no action.
     } catch (err) {
       console.error('[XPortl MyCapsules] friend action failed:', err);
+      r = { ok: false, reason: 'exception' };
+    }
+    // Surface a user-visible hint for any non-ok result so users aren't
+    // left wondering whether their tap landed. Silent failures here are
+    // especially bad in demos: the button goes back to idle with no signal.
+    if (r && !r.ok) {
+      const msg =
+        r.reason === 'no_pending_request' ? 'Solicitacao ja foi cancelada' :
+        r.reason === 'invalid' ? 'Acao invalida' :
+        'Nao foi possivel agora. Tente novamente.';
+      setFriendErrors((e) => ({ ...e, [otherUserId]: msg }));
     }
     setFriendActionId(null);
   };
@@ -262,6 +278,7 @@ export default function MyCapsulesPage({ session, onBack, onRefreshProfile }) {
                   {!loadingList && list?.map((i) => {
                     const st = friendStates[i.userId] || 'none';
                     const busy = friendActionId === i.userId;
+                    const err = friendErrors[i.userId];
                     return (
                       <div key={i.userId} style={s.interactor}>
                         {i.avatarUrl ? (
@@ -272,6 +289,7 @@ export default function MyCapsulesPage({ session, onBack, onRefreshProfile }) {
                         <div style={s.interactorMeta}>
                           <span style={s.interactorName}>{i.displayName || 'Portal Walker'}</span>
                           <span style={s.interactorKinds}>{humanizeKinds(i.kinds)} · {formatDate(i.latestAt)}</span>
+                          {err && <span style={s.friendError}>{err}</span>}
                         </div>
                         <FriendBtn state={st} busy={busy} onClick={() => handleFriendAction(i.userId)} />
                       </div>
@@ -475,6 +493,7 @@ const s = {
     fontSize: '0.7rem', fontWeight: 700,
   },
   interactorMeta: { display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 },
+  friendError: { fontSize: '0.55rem', color: '#ff3366', marginTop: 2 },
   interactorName: {
     fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-primary)',
     whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',

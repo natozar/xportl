@@ -400,7 +400,7 @@ export default function App() {
     if (!ready) return;
     const shared = decodeShareToken();
     if (shared) {
-      // Clean the hash so the token doesn't persist
+      // Clean hash *and* query so the token doesn't persist across reloads.
       window.history.replaceState(null, '', window.location.pathname);
       // Fetch the capsule and open it
       (async () => {
