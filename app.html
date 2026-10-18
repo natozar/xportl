@@ -51,6 +51,26 @@
 
     <title>XPortl</title>
 
+    <!-- Share previews (WhatsApp / iMessage / X / LinkedIn). Crawlers don't
+         run JS, so every /app link — including the ?lat/lng and #capsule
+         share formats — needs static OG tags here. -->
+    <meta property="og:site_name" content="XPortl" />
+    <meta property="og:type" content="website" />
+    <meta property="og:locale" content="pt_BR" />
+    <meta property="og:url" content="https://xportl.com/app" />
+    <meta property="og:title" content="XPortl — Alguém deixou um portal pra você" />
+    <meta property="og:description" content="Um portal de realidade aumentada ancorado num lugar real. Abra no celular, chegue perto e desbloqueie. Sem download." />
+    <meta property="og:image" content="https://xportl.com/og-image.png?v=2" />
+    <meta property="og:image:secure_url" content="https://xportl.com/og-image.png?v=2" />
+    <meta property="og:image:type" content="image/png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="XPortl — O mundo real agora tem portais." />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="XPortl — Alguém deixou um portal pra você" />
+    <meta name="twitter:description" content="Um portal de realidade aumentada ancorado num lugar real. Abra no celular, chegue perto e desbloqueie." />
+    <meta name="twitter:image" content="https://xportl.com/og-image.png?v=2" />
+
     <!-- A-Frame + AR.js (defer so they don't block First Paint) -->
     <script defer src="https://aframe.io/releases/1.3.0/aframe.min.js" crossorigin="anonymous"></script>
     <script defer src="https://unpkg.com/aframe-look-at-component@0.8.0/dist/aframe-look-at-component.min.js" crossorigin="anonymous"></script>

@@ -19,6 +19,7 @@
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
 const SUPABASE_ANON = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
+const DEFAULT_OG_IMAGE = 'https://xportl.com/og-image.png?v=2';
 
 function escapeHtml(s) {
   if (s == null) return '';
@@ -37,7 +38,16 @@ function isUuid(v) {
 function renderPage({ title, description, imageUrl, rarityLabel, rarityColor, locked, bodySnippet, shareUrl, ctaHref }) {
   const t = escapeHtml(title);
   const d = escapeHtml(description);
-  const img = escapeHtml(imageUrl || 'https://xportl.com/og-image.png');
+  const img = escapeHtml(imageUrl || DEFAULT_OG_IMAGE);
+  // WhatsApp only renders the large preview reliably when it knows the
+  // dimensions up front — we only know them for our own default image.
+  const isDefaultImg = !imageUrl || imageUrl === DEFAULT_OG_IMAGE;
+  const imgMeta = isDefaultImg
+    ? `<meta property="og:image:secure_url" content="${img}">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">`
+    : `<meta property="og:image:secure_url" content="${img}">`;
   const rl = escapeHtml(rarityLabel || '');
   const rc = escapeHtml(rarityColor || '#00f0ff');
   const snippet = escapeHtml(bodySnippet || '');
@@ -55,9 +65,12 @@ function renderPage({ title, description, imageUrl, rarityLabel, rarityColor, lo
 
 <meta property="og:site_name" content="XPortl">
 <meta property="og:type" content="website">
+<meta property="og:locale" content="pt_BR">
 <meta property="og:title" content="${t}">
 <meta property="og:description" content="${d}">
 <meta property="og:image" content="${img}">
+${imgMeta}
+<meta property="og:image:alt" content="${t}">
 <meta property="og:url" content="${su}">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="${t}">
@@ -109,7 +122,7 @@ function fallbackPage({ shareUrl }) {
   return renderPage({
     title: 'Portal nao encontrado',
     description: 'Esse portal pode ter sido removido ou ainda nao existe. Explore outros rastros no XPortl.',
-    imageUrl: 'https://xportl.com/og-image.png',
+    imageUrl: DEFAULT_OG_IMAGE,
     rarityLabel: '',
     rarityColor: '#00f0ff',
     locked: false,
@@ -182,7 +195,7 @@ export default async function handler(req, res) {
     const imageUrl =
       !hidden && cap.media_type === 'image' && cap.media_url
         ? cap.media_url
-        : 'https://xportl.com/og-image.png';
+        : DEFAULT_OG_IMAGE;
 
     const html = renderPage({
       title,
